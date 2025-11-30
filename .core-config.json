@@ -1,0 +1,7 @@
+{
+  "coreRepo": "marcusquinn/ecommerce-order-history-csv-download-mcp-core",
+  "coreBranch": "main",
+  "autoUpdate": true,
+  "devMode": false,
+  "localCorePath": null
+}

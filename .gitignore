@@ -1,0 +1,90 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*token*
+*secret*
+secrets/
+
+# Config files with actual values (templates are .txt)
+configs/*.json
+!configs/*.json.txt
+.core-config.local.json
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Quality tool outputs
+reports/
+*.sarif
+.scannerwork/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Session data (browser automation)
+.browser-data/
+cookies/
+sessions/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# TypeScript cache
+*.tsbuildinfo
+
+# AI tool symlinks - TRACK these
+!.cursorrules
+!.windsurfrules
+!CLAUDE.md
+!.opencode/

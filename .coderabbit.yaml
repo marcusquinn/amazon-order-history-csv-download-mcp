@@ -1,0 +1,12 @@
+language: en-US
+
+reviews:
+  high_level_summary: true
+  poem: false
+  collapse_walkthrough: true
+  
+chat:
+  auto_reply: true
+
+early_access: false
+enable_free_tier: true

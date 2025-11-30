@@ -1,0 +1,11 @@
+engines:
+  eslint:
+    enabled: true
+  typescript:
+    enabled: true
+
+exclude_paths:
+  - "node_modules/**"
+  - "dist/**"
+  - "coverage/**"
+  - "tests/fixtures/**"

@@ -1,0 +1,23 @@
+# Test orchestration for Amazon Order History CSV Download MCP
+services:
+  test:
+    build:
+      context: ../..
+      dockerfile: tests/docker/Dockerfile
+    command: ["npm", "test"]
+    volumes:
+      - ../../coverage:/home/testuser/app/coverage
+
+  test-unit:
+    build:
+      context: ../..
+      dockerfile: tests/docker/Dockerfile
+    command: ["npm", "run", "test:unit"]
+
+  shell:
+    build:
+      context: ../..
+      dockerfile: tests/docker/Dockerfile
+    command: ["/bin/bash"]
+    stdin_open: true
+    tty: true

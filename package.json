@@ -1,0 +1,68 @@
+{
+  "name": "amazon-order-history-csv-download-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for downloading Amazon order history as CSV - supports orders, items, shipments, and transactions export",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run sync-core && node dist/index.js",
+    "dev": "CORE_DEV_MODE=true tsx watch src/index.ts",
+    "sync-core": "node scripts/sync-core.js",
+    "link-core": "node scripts/link-local-core.js",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:docker": "cd tests/docker && docker-compose run --rm test",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "setup": "npm install && npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "amazon",
+    "order-history",
+    "csv",
+    "download",
+    "export",
+    "ai",
+    "automation",
+    "playwright",
+    "scraper"
+  ],
+  "author": "Marcus Quinn",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcusquinn/amazon-order-history-csv-download-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/issues"
+  },
+  "homepage": "https://github.com/marcusquinn/amazon-order-history-csv-download-mcp#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "playwright": "^1.40.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.1.0",
+    "ts-jest": "^29.1.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}
