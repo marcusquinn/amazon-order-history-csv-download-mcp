@@ -137,22 +137,25 @@ Detailed item-level export with full order context (~2s per order). Best for exp
 
 ### Shipments (`export_amazon_shipments_csv`)
 
-Shipment and tracking information (~4s per order). Best for delivery tracking.
+Shipment and tracking information (~4s per order, +2s with `fetch_tracking_numbers`). Best for delivery tracking.
 
-| Column            | Description                |
-| ----------------- | -------------------------- |
-| Order ID          | Parent order identifier    |
-| Order Date        | Date order was placed      |
-| Shipment ID       | Unique shipment identifier |
-| Status            | Shipment status text       |
-| Delivered         | Yes/No/Unknown             |
-| Tracking ID       | Carrier tracking number    |
-| Tracking URL      | Link to carrier tracking   |
-| Items in Shipment | Number of items            |
-| Item Names        | List of product names      |
-| Payment Amount    | Amount charged             |
-| Refund            | Refund amount if any       |
-| Region            | Amazon region code         |
+| Column            | Description                                |
+| ----------------- | ------------------------------------------ |
+| Order ID          | Parent order identifier                    |
+| Order Date        | Date order was placed                      |
+| Shipment ID       | Unique shipment identifier                 |
+| Status            | Shipment status text                       |
+| Delivered         | Yes/No/Unknown                             |
+| Tracking ID       | Carrier tracking number                    |
+| Carrier           | Carrier name (Royal Mail, DPD, etc.)       |
+| Tracking URL      | Link to carrier tracking                   |
+| Items in Shipment | Number of items                            |
+| Item Names        | List of product names                      |
+| Payment Amount    | Amount charged (falls back to order total) |
+| Refund            | Refund amount if any                       |
+| Region            | Amazon region code                         |
+
+**Note**: Set `fetch_tracking_numbers: true` to visit ship-track pages and extract actual carrier tracking IDs (e.g., "AZ218181365JE") and carrier names. Without this option, only Amazon's internal tracking URLs are captured.
 
 ### Transactions (`export_amazon_transactions_csv`)
 
