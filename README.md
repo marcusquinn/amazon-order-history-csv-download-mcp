@@ -2,7 +2,7 @@
 
 [![GitHub Actions](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/workflows/Code%20Quality/badge.svg)](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-0.3.0-blue)](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/releases)
+[![Version](https://img.shields.io/badge/Version-0.3.1-blue)](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/releases)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
 [![AGENTS.md](https://img.shields.io/badge/AGENTS.md-Compliant-blue.svg)](https://agents.md/)
 

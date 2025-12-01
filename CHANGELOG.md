@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2024-12-01
+
+### Added
+
+- Automated release workflow triggered by VERSION file changes
+- ESLint configuration (.eslintrc.js) for code quality CI
+
+### Fixed
+
+- ESLint errors: no-constant-condition, prefer-const, no-useless-escape, no-var-requires
+
+### Changed
+
+- Consolidated 4 separate agents into single `@amazon-order-history` agent
+- Updated README with Carrier column documentation for shipments CSV
+
 ## [0.3.0] - 2024-12-01
 
 ### Added
@@ -79,7 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-region date and currency parsing utilities
 - XPath extraction strategies for Amazon DOM
 
-[Unreleased]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/releases/tag/v0.1.0

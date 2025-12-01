@@ -1,6 +1,6 @@
 {
   "name": "amazon-order-history-csv-download-mcp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MCP server for downloading Amazon order history as CSV - supports orders, items, shipments, and transactions export",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
