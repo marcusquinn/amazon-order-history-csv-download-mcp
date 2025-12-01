@@ -1,6 +1,6 @@
 #!/bin/bash
 # Amazon Order History CSV Download MCP - Setup Script
-# Version: 0.1.0
+# Version: 0.3.0
 
 set -e
 
@@ -84,6 +84,51 @@ build_project() {
     return 0
 }
 
+run_tests() {
+    print_info "Running tests..."
+    if npm test; then
+        print_success "All tests passed"
+        return 0
+    else
+        print_warning "Some tests failed - check output above"
+        return 0
+    fi
+}
+
+install_opencode_agent() {
+    print_info "Installing OpenCode agent..."
+    
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local agent_source="$script_dir/.agent/amazon-order-history.md"
+    local agent_target="$HOME/.opencode/agent/amazon-order-history.md"
+    
+    # Check if source exists
+    if [ ! -f "$agent_source" ]; then
+        print_warning "Agent file not found: $agent_source"
+        return 0
+    fi
+    
+    # Create target directory
+    mkdir -p "$HOME/.opencode/agent"
+    
+    # Remove old symlink if exists
+    if [ -L "$agent_target" ] || [ -f "$agent_target" ]; then
+        rm -f "$agent_target"
+    fi
+    
+    # Create symlink
+    ln -sf "$agent_source" "$agent_target"
+    
+    if [ -L "$agent_target" ]; then
+        print_success "OpenCode agent installed: @amazon-order-history"
+    else
+        print_warning "Failed to create agent symlink"
+    fi
+    
+    return 0
+}
+
 show_help() {
     cat << EOF
 Amazon Order History CSV Download MCP - Setup Script
@@ -113,7 +158,7 @@ main() {
     
     echo "================================================"
     echo "Amazon Order History CSV Download MCP"
-    echo "Setup Script v0.1.0"
+    echo "Setup Script v0.3.0"
     echo "================================================"
     echo ""
     
@@ -127,6 +172,8 @@ main() {
             install_dependencies || return 1
             install_playwright || return 1
             build_project || return 1
+            run_tests || return 1
+            install_opencode_agent || return 1
             ;;
         *)
             print_error "Unknown command: $command"
@@ -141,7 +188,7 @@ main() {
     print_info "Next steps:"
     echo "  1. Configure your MCP client (see README.md)"
     echo "  2. Log in to Amazon in the browser session"
-    echo "  3. Start using the MCP tools"
+    echo "  3. Use @amazon-order-history agent or MCP tools directly"
     echo ""
     
     return 0
