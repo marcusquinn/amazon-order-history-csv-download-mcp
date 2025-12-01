@@ -259,7 +259,7 @@ function splitAddressLines(content: string): string[] {
   );
 
   // First decode HTML entities
-  let decoded = content
+  const decoded = content
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&")
@@ -269,7 +269,7 @@ function splitAddressLines(content: string): string[] {
   debug(`[splitAddressLines] After decode: ${decoded.slice(0, 300)}`);
 
   // Split by various line break patterns
-  let lines = decoded
+  const lines = decoded
     .split(/<br\s*\/?>/gi) // <br>, <br/>, <br />
     .flatMap((part) => part.split(/\n/)) // Also split by newlines
     .map((line) => {

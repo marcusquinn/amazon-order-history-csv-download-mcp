@@ -3,6 +3,8 @@
  */
 
 import { writeFile } from "fs/promises";
+import { homedir } from "os";
+import { join } from "path";
 import { toCSVWithColumns } from "../core/utils/csv";
 import { Item } from "../core/types/item";
 import { Shipment } from "../core/types/shipment";
@@ -197,8 +199,6 @@ export function generateExportFilename(
  * Get default Downloads directory path.
  */
 export function getDefaultDownloadsPath(): string {
-  const { homedir } = require("os");
-  const { join } = require("path");
   return join(homedir(), "Downloads");
 }
 
@@ -338,7 +338,6 @@ export function getOutputPath(
     return outputPath;
   }
 
-  const { join } = require("path");
   const filename = generateExportFilename(exportType, region, options);
   return join(getDefaultDownloadsPath(), filename);
 }

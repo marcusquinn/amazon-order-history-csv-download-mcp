@@ -202,7 +202,7 @@ export async function fetchOrders(
       }
 
       // Try to extract items - first try data-component, then fall back to extractFromInvoice
-      let itemContainers = await page
+      const itemContainers = await page
         .locator('[data-component="purchasedItems"]')
         .all();
       console.error(

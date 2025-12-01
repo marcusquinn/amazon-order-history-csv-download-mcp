@@ -44,7 +44,7 @@ export function parseMoney(formatted: string, defaultCurrency = "USD"): Money {
   const startsWithNegative = cleaned.startsWith("-") || cleaned.startsWith("(");
 
   // Remove leading negative sign or opening parenthesis for currency detection
-  let workingStr = cleaned.replace(/^[-(\s]+/, "");
+  const workingStr = cleaned.replace(/^[-(\s]+/, "");
 
   // Extract currency symbol/code
   let currency = defaultCurrency;

@@ -133,7 +133,8 @@ export async function extractGiftCardData(
   const allTransactions: GiftCardTransaction[] = [];
   let pageCount = 0;
 
-  while (true) {
+  let hasMorePages = true;
+  while (hasMorePages) {
     pageCount++;
 
     // Extract transactions from current page
@@ -141,12 +142,17 @@ export async function extractGiftCardData(
     allTransactions.push(...pageTransactions);
 
     // Check if we should continue to next page
-    if (!fetchAllPages) break;
-    if (maxPages > 0 && pageCount >= maxPages) break;
+    if (!fetchAllPages) {
+      hasMorePages = false;
+      continue;
+    }
+    if (maxPages > 0 && pageCount >= maxPages) {
+      hasMorePages = false;
+      continue;
+    }
 
     // Check for and click "Next" pagination button
-    const hasNextPage = await goToNextGiftCardPage(page);
-    if (!hasNextPage) break;
+    hasMorePages = await goToNextGiftCardPage(page);
 
     // Wait for the new page content to load
     await page.waitForTimeout(500);

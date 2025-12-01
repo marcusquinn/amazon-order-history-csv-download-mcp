@@ -59,7 +59,7 @@ async function extractGrandTotal(page: Page, currency: string): Promise<Money> {
   // Clean up the extracted value
   if (totalText) {
     // Remove label prefix if present
-    let cleaned = totalText
+    const cleaned = totalText
       .replace(/^.*:/, '')  // Remove everything before colon
       .replace(/[\n\t ]/g, '')  // Remove whitespace
       .replace('-', '');  // Remove negative sign
