@@ -340,6 +340,10 @@ This project uses a plugin architecture designed for extensibility:
 
 See [AGENTS.md](AGENTS.md) for detailed architecture documentation.
 
+## Related Projects
+
+- **[QuickFile MCP](https://github.com/marcusquinn/quickfile-mcp)** - MCP server for QuickFile UK accounting software. Use Amazon order exports with QuickFile for expense tracking and VAT reconciliation.
+
 ## Credits
 
 This project was inspired by [AZAD](https://github.com/philipmulcahy/azad), a Chrome
