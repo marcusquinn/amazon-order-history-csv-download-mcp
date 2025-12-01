@@ -1,6 +1,7 @@
 # Amazon Order History CSV Download MCP - AI Assistant Guide
 
 <!-- AI-CONTEXT-START -->
+
 ## Quick Reference
 
 - **Purpose**: MCP server for extracting Amazon order history to CSV
@@ -9,6 +10,7 @@
 - **Architecture**: Core framework + platform plugin design
 
 **Key Commands**:
+
 ```bash
 npm run dev          # Development mode (uses local core)
 npm run start        # Production mode (syncs core first)
@@ -27,13 +29,8 @@ npm run build        # Compile TypeScript
 | `export_amazon_transactions_csv` | Export payment transactions CSV |
 | `check_amazon_auth_status` | Check browser session auth |
 
-**Agents**:
-| Agent | File |
-|-------|------|
-| `@amazon-orders-download` | Orders summary export |
-| `@amazon-order-items-download` | Items detail export |
-| `@amazon-order-shipments-download` | Shipments/tracking export |
-| `@amazon-order-transactions-download` | Transactions export |
+**Agent**: `@amazon-order-history` - Unified agent for all export types
+
 <!-- AI-CONTEXT-END -->
 
 ## Project Overview
@@ -44,24 +41,24 @@ major Amazon regional sites.
 
 ### Supported Amazon Regions (16)
 
-| Region | Domain | Currency | Tax Fields |
-|--------|--------|----------|------------|
-| United States | amazon.com | USD | Sales Tax |
-| United Kingdom | amazon.co.uk | GBP | VAT |
-| Canada | amazon.ca | CAD | GST, PST |
-| Germany | amazon.de | EUR | VAT |
-| France | amazon.fr | EUR | VAT |
-| Spain | amazon.es | EUR | VAT |
-| Italy | amazon.it | EUR | VAT |
-| Netherlands | amazon.nl | EUR | VAT |
-| Japan | amazon.co.jp | JPY | - |
-| Australia | amazon.com.au | AUD | GST |
-| Mexico | amazon.com.mx | MXN | IVA |
-| India | amazon.in | INR | GST |
-| UAE | amazon.ae | AED | VAT |
-| Saudi Arabia | amazon.sa | SAR | VAT |
-| Ireland | amazon.ie | EUR | VAT |
-| Belgium | amazon.com.be | EUR | VAT |
+| Region         | Domain        | Currency | Tax Fields |
+| -------------- | ------------- | -------- | ---------- |
+| United States  | amazon.com    | USD      | Sales Tax  |
+| United Kingdom | amazon.co.uk  | GBP      | VAT        |
+| Canada         | amazon.ca     | CAD      | GST, PST   |
+| Germany        | amazon.de     | EUR      | VAT        |
+| France         | amazon.fr     | EUR      | VAT        |
+| Spain          | amazon.es     | EUR      | VAT        |
+| Italy          | amazon.it     | EUR      | VAT        |
+| Netherlands    | amazon.nl     | EUR      | VAT        |
+| Japan          | amazon.co.jp  | JPY      | -          |
+| Australia      | amazon.com.au | AUD      | GST        |
+| Mexico         | amazon.com.mx | MXN      | IVA        |
+| India          | amazon.in     | INR      | GST        |
+| UAE            | amazon.ae     | AED      | VAT        |
+| Saudi Arabia   | amazon.sa     | SAR      | VAT        |
+| Ireland        | amazon.ie     | EUR      | VAT        |
+| Belgium        | amazon.com.be | EUR      | VAT        |
 
 ## Architecture
 
@@ -85,9 +82,9 @@ src/
 
 The project supports two operational modes:
 
-| Mode | Use Case | Core Location |
-|------|----------|---------------|
-| Consumer | End users | `src/core/` (bundled, auto-updates) |
+| Mode      | Use Case     | Core Location                         |
+| --------- | ------------ | ------------------------------------- |
+| Consumer  | End users    | `src/core/` (bundled, auto-updates)   |
 | Developer | Contributors | Sibling repo via `CORE_DEV_MODE=true` |
 
 ## Development Guidelines
@@ -95,6 +92,7 @@ The project supports two operational modes:
 ### Shell Script Standards
 
 All shell scripts must follow these rules:
+
 - Every function must have explicit `return 0` or `return 1`
 - Never use positional parameters directly - assign to local variables
 - Define constants for strings used 3+ times
@@ -149,6 +147,7 @@ amazon-order-history-csv-download-mcp/
 ## Version Management
 
 All version references must stay synchronized:
+
 - `VERSION` file
 - `package.json` version field
 - `README.md` badges
