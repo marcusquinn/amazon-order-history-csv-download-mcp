@@ -1,14 +1,14 @@
-import { Money } from './money';
-import { Item } from './item';
-import { OrderHeader } from './order';
+import { Money } from "./money";
+import { Item } from "./item";
+import { OrderHeader } from "./order";
 
 /**
  * Delivery status enumeration.
  */
 export enum DeliveryStatus {
-  YES = 'delivered',
-  NO = 'not_delivered',
-  UNKNOWN = 'unknown',
+  YES = "delivered",
+  NO = "not_delivered",
+  UNKNOWN = "unknown",
 }
 
 /**
@@ -38,6 +38,8 @@ export interface Shipment {
   // Tracking
   trackingLink: string;
   trackingId: string;
+  /** Carrier name (e.g., "JERSEY_POST", "Whistl Group", "Royal Mail") */
+  carrier?: string;
 
   // Financial
   transaction?: ShipmentTransaction;

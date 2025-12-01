@@ -1,0 +1,39 @@
+<!-- Sample UK Amazon order card HTML for integration testing -->
+<div data-component="orderCard" class="order-card">
+  <div class="order-header">
+    <span class="order-date-header">Order placed</span>
+    <span>14 November 2024</span>
+  </div>
+  <div class="order-info">
+    <span class="yohtmlc-order-id">
+      <span>ORDER # 123-4567890-1234567</span>
+    </span>
+    <div>
+      <span>Total</span>
+      <span>£49.99</span>
+    </div>
+  </div>
+  <div data-component="purchasedItems">
+    <div data-component="itemTitle">
+      <a href="/dp/B0TEST1234">Test Product 1</a>
+    </div>
+  </div>
+  <div data-component="purchasedItems">
+    <div data-component="itemTitle">
+      <a href="/dp/B0TEST5678">Test Product 2</a>
+    </div>
+  </div>
+  <div class="delivery-box__primary-text">Delivered 16 November</div>
+  <script type="text/template" id="shipToData-shippingAddress-abc123">
+    <span>John Smith</span><br>
+    123 High Street<br>
+    LONDON<br>
+    SW1A 1AA<br>
+    United Kingdom
+  </script>
+  <div data-component="viewPaymentPlanSummaryWidget">
+    <span data-testid="method-details-name">Visa</span>
+    <span data-testid="method-details-number">****1234</span>
+  </div>
+  <span>Auto-delivered: Every 1 month</span>
+</div>

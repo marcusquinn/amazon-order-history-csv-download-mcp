@@ -1,5 +1,5 @@
 import { Page } from 'playwright';
-import { Order, OrderHeader, OrderDetails } from './order';
+import { OrderHeader, OrderDetails } from './order';
 import { Item } from './item';
 import { Shipment } from './shipment';
 

@@ -136,10 +136,11 @@ export const AMAZON_REGIONS: Region[] = [
 ];
 
 /**
- * Get region by code.
+ * Get region by code (case-insensitive).
  */
 export function getRegionByCode(code: string): Region | undefined {
-  return AMAZON_REGIONS.find((r) => r.code === code);
+  const normalizedCode = code?.toLowerCase();
+  return AMAZON_REGIONS.find((r) => r.code === normalizedCode);
 }
 
 /**

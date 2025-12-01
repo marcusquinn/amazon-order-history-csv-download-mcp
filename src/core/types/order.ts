@@ -1,18 +1,18 @@
-import { Money } from './money';
-import { Item } from './item';
-import { Shipment } from './shipment';
+import { Money } from "./money";
+import { Item } from "./item";
+import { Shipment } from "./shipment";
 
 /**
  * Order status enumeration.
  */
 export type OrderStatusCode =
-  | 'pending'
-  | 'processing'
-  | 'shipped'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded'
-  | 'unknown';
+  | "pending"
+  | "processing"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "refunded"
+  | "unknown";
 
 /**
  * Order status with code and display label.
@@ -91,16 +91,50 @@ export interface Order {
 }
 
 /**
- * Order header - minimal info from order list page.
+ * Order header - info from order list page.
+ * Enhanced to capture all available data from order cards.
  */
 export interface OrderHeader {
   id: string;
+  orderId: string; // Alias for id
   date: Date | null;
   total: Money;
   detailUrl: string;
   recipient?: string;
+  status?: OrderStatus;
   platform: string;
   region: string;
+
+  // Enhanced fields from order list page
+  subtotal?: Money;
+  shipping?: Money;
+  tax?: Money;
+  vat?: Money;
+  promotion?: Money;
+  grandTotal?: Money;
+
+  // Shipping address - simple line-based structure (up to 7 lines)
+  shippingAddress?: {
+    line1?: string;
+    line2?: string;
+    line3?: string;
+    line4?: string;
+    line5?: string;
+    line6?: string;
+    line7?: string;
+  };
+
+  // Payment method
+  paymentMethod?: {
+    type: string; // e.g., "Visa", "Mastercard", "Wise Card"
+    lastFour?: string; // e.g., "3858"
+  };
+
+  // Item count (from order list page - count of items visible on card)
+  itemCount?: number;
+
+  // Subscribe & Save frequency (e.g., "Every 1 month")
+  subscribeAndSave?: string;
 }
 
 /**

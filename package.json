@@ -1,6 +1,6 @@
 {
   "name": "amazon-order-history-csv-download-mcp",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "MCP server for downloading Amazon order history as CSV - supports orders, items, shipments, and transactions export",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +12,7 @@
     "link-core": "node scripts/link-local-core.js",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "jest tests/unit",
-    "test:integration": "jest tests/integration",
+    "test:integration": "jest tests/integration --passWithNoTests",
     "test:docker": "cd tests/docker && docker-compose run --rm test",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

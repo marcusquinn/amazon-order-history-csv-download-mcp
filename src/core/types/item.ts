@@ -14,6 +14,7 @@ export interface Item {
   description?: string;
   category?: string;
   imageUrl?: string;
+  condition?: string;  // "New", "Used - Very Good", etc.
 
   // Quantity and pricing
   quantity: number;
@@ -30,7 +31,12 @@ export interface Item {
   seller?: {
     name: string;
     id?: string;
+    soldBy?: string;       // "Sold by" value
+    suppliedBy?: string;   // "Supplied by" / "Fulfilled by" value
   };
+
+  // Subscribe & Save info
+  subscriptionFrequency?: string;  // e.g., "Every 1 month"
 
   // Platform-specific data
   platformData: Record<string, unknown>;

@@ -15,7 +15,7 @@ export async function getTextByXPath(
 ): Promise<string> {
   try {
     const element = page.locator(`xpath=${xpath}`).first();
-    const text = await element.textContent({ timeout: 5000 });
+    const text = await element.textContent({ timeout: 1000 });
     return text?.trim() || defaultValue;
   } catch {
     return defaultValue;
@@ -95,7 +95,7 @@ export async function getAttributeByXPath(
 ): Promise<string> {
   try {
     const element = page.locator(`xpath=${xpath}`).first();
-    const value = await element.getAttribute(attribute, { timeout: 5000 });
+    const value = await element.getAttribute(attribute, { timeout: 1000 });
     return value || defaultValue;
   } catch {
     return defaultValue;
@@ -149,7 +149,7 @@ export function moneyRegex(): RegExp {
 export async function waitForAnySelector(
   page: Page,
   selectors: string[],
-  timeout = 10000
+  timeout = 3000
 ): Promise<string | null> {
   const startTime = Date.now();
   
@@ -164,7 +164,7 @@ export async function waitForAnySelector(
         // Selector not found, continue
       }
     }
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(50);  // Reduced from 100ms
   }
   
   return null;
