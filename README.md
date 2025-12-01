@@ -343,6 +343,11 @@ See [AGENTS.md](AGENTS.md) for detailed architecture documentation.
 ## Related Projects
 
 - **[QuickFile MCP](https://github.com/marcusquinn/quickfile-mcp)** - MCP server for QuickFile UK accounting software. Use Amazon order exports with QuickFile for expense tracking and VAT reconciliation.
+- **[OpenCode](https://opencode.ai)** - Open-source AI coding assistant with MCP support
+- **[QuickFile](https://www.quickfile.co.uk/)** - UK accounting software
+- **[QuickFile API](https://api.quickfile.co.uk/)** - QuickFile API documentation
+- **[Model Context Protocol](https://modelcontextprotocol.io)** - Protocol specification for AI tool integration
+- **[AI DevOps Framework](https://github.com/marcusquinn/aidevops)** - Comprehensive AI infrastructure management
 
 ## Credits
 
