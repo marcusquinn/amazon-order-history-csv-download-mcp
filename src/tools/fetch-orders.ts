@@ -19,6 +19,18 @@ import {
 import { extractFromInvoice } from "../amazon/extractors/invoice";
 import { getRegionByCode } from "../amazon/regions";
 
+function toStartOfDay(d: Date): Date {
+  const r = new Date(d);
+  r.setHours(0, 0, 0, 0);
+  return r;
+}
+
+function toEndOfDay(d: Date): Date {
+  const r = new Date(d);
+  r.setHours(23, 59, 59, 999);
+  return r;
+}
+
 /**
  * Parse invoice address lines into simple line1-line7 structure.
  */
@@ -563,7 +575,12 @@ export async function fetchOrders(
       return result;
     }
 
-    // Extract orders from all pages
+    // Extract orders from all pages. When a date window is supplied, drop
+    // orders that fall outside it and stop paginating as soon as the oldest
+    // order on the current page predates startDate (Amazon paginates
+    // newest-first, so once we're past startDate no earlier page will help).
+    const windowStart = startDate ? toStartOfDay(new Date(startDate)) : null;
+    const windowEnd = endDate ? toEndOfDay(new Date(endDate)) : null;
     let pageNum = 1;
     let hasMore = true;
 
@@ -580,8 +597,19 @@ export async function fetchOrders(
       console.error(
         `[fetch-orders] Found ${pageHeaders.length} orders on page ${pageNum}`,
       );
+
+      const filteredHeaders =
+        windowStart || windowEnd
+          ? pageHeaders.filter((h) => {
+              if (!h.date) return true; // include orders with unknown dates conservatively
+              if (windowStart && h.date < windowStart) return false;
+              if (windowEnd && h.date > windowEnd) return false;
+              return true;
+            })
+          : pageHeaders;
+
       // Cast to the enriched type for result storage
-      result.orders.push(...(pageHeaders as EnrichedOrder[]));
+      result.orders.push(...(filteredHeaders as EnrichedOrder[]));
       onProgress?.(
         `Found ${result.orders.length} orders (page ${pageNum})...`,
         result.orders.length,
@@ -592,6 +620,25 @@ export async function fetchOrders(
       if (maxOrders && result.orders.length >= maxOrders) {
         result.orders = result.orders.slice(0, maxOrders);
         break;
+      }
+
+      // Early-terminate pagination when the page's oldest dated order is
+      // already older than the window's startDate.
+      if (windowStart) {
+        const datedOnPage = pageHeaders
+          .map((h) => h.date)
+          .filter((d): d is Date => d != null);
+        if (datedOnPage.length > 0) {
+          const oldestOnPage = datedOnPage.reduce((min, d) =>
+            d < min ? d : min,
+          );
+          if (oldestOnPage < windowStart) {
+            console.error(
+              `[fetch-orders] Page ${pageNum} oldest order ${oldestOnPage.toISOString()} < windowStart ${windowStart.toISOString()} — stopping pagination`,
+            );
+            break;
+          }
+        }
       }
 
       // Check for next page

@@ -149,6 +149,13 @@ export class AmazonPlugin extends BasePlatformPlugin {
 
   /**
    * Get order list URL with filters.
+   *
+   * Amazon's order-history page accepts timeFilter=year-YYYY or
+   * timeFilter=months-N (N ∈ {1, 3}). It does NOT accept a custom date
+   * range. When the caller supplies startDate / endDate but no explicit
+   * year or months, we pick the smallest covering timeFilter so the
+   * server returns a narrower page set; per-page date filtering and
+   * early pagination termination then happen in fetchOrders.
    */
   getOrderListUrl(region: string, params: OrderListParams): string {
     const regionConfig = getRegionByCode(region);
@@ -162,6 +169,20 @@ export class AmazonPlugin extends BasePlatformPlugin {
       queryParams.set("timeFilter", `year-${params.year}`);
     } else if (params.months) {
       queryParams.set("timeFilter", `months-${params.months}`);
+    } else if (params.startDate) {
+      const now = new Date();
+      const start = params.startDate;
+      const end = params.endDate ?? now;
+      const daysAgo = (d: Date) =>
+        (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+
+      if (daysAgo(start) <= 30 && daysAgo(end) <= 30) {
+        queryParams.set("timeFilter", "months-1");
+      } else if (daysAgo(start) <= 90 && daysAgo(end) <= 90) {
+        queryParams.set("timeFilter", "months-3");
+      } else {
+        queryParams.set("timeFilter", `year-${start.getFullYear()}`);
+      }
     }
 
     if (params.startIndex) {
