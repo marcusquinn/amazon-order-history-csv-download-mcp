@@ -1,0 +1,94 @@
+<!--
+  Minimal hand-crafted fixture for the qty-attribution regression test.
+
+  Mirrors the relevant subset of the /gp/css/summary/print.html DOM seen
+  on a real multi-item shipment. Two purchasedItems containers:
+
+  Container A — one row, no qty badge          → expected qty 1
+  Container B — three rows in source order:
+    Row 1: itemTitle only (no qty badge)        → expected qty 1
+    Row 2: itemTitle + .od-item-view-qty=2      → expected qty 2
+    Row 3: itemTitle only (no qty badge)        → expected qty 1
+
+  The bug being guarded against: when titleLinks, priceElements and
+  qtyElements are collected as flat positional lists across the whole
+  container, the single qty=2 badge in row 2 is mis-attributed to row 1
+  and row 2 then defaults to qty 1.
+-->
+<!DOCTYPE html>
+<html lang="en-GB">
+<body>
+
+<div data-component="purchasedItems">
+  <div class="a-fixed-left-grid">
+    <div class="a-fixed-left-grid-inner">
+      <div class="a-fixed-left-grid-col a-col-left">
+        <a href="/dp/B00TEST0001"><img alt="USB Cable"></a>
+      </div>
+      <div class="a-fixed-left-grid-col a-col-right">
+        <div data-component="purchasedItemsRightGrid">
+          <div data-component="itemTitle">
+            <a href="/dp/B00TEST0001?ref_=test">USB Cable</a>
+          </div>
+          <div data-component="unitPrice"><span class="a-offscreen">£9.99</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div data-component="purchasedItems">
+
+  <div class="a-fixed-left-grid">
+    <div class="a-fixed-left-grid-inner">
+      <div class="a-fixed-left-grid-col a-col-left">
+        <a href="/dp/B00TEST0002"><img alt="Notebook"></a>
+      </div>
+      <div class="a-fixed-left-grid-col a-col-right">
+        <div data-component="purchasedItemsRightGrid">
+          <div data-component="itemTitle">
+            <a href="/dp/B00TEST0002?ref_=test">Notebook</a>
+          </div>
+          <div data-component="unitPrice"><span class="a-offscreen">£4.50</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="a-fixed-left-grid">
+    <div class="a-fixed-left-grid-inner">
+      <div class="a-fixed-left-grid-col a-col-left">
+        <a href="/dp/B00TEST0003"><img alt="Wireless Mouse"></a>
+        <div class="od-item-view-qty"><span>2</span></div>
+      </div>
+      <div class="a-fixed-left-grid-col a-col-right">
+        <div data-component="purchasedItemsRightGrid">
+          <div data-component="itemTitle">
+            <a href="/dp/B00TEST0003?ref_=test">Wireless Mouse</a>
+          </div>
+          <div data-component="unitPrice"><span class="a-offscreen">£14.99</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="a-fixed-left-grid">
+    <div class="a-fixed-left-grid-inner">
+      <div class="a-fixed-left-grid-col a-col-left">
+        <a href="/dp/B00TEST0004"><img alt="Desk Lamp"></a>
+      </div>
+      <div class="a-fixed-left-grid-col a-col-right">
+        <div data-component="purchasedItemsRightGrid">
+          <div data-component="itemTitle">
+            <a href="/dp/B00TEST0004?ref_=test">Desk Lamp</a>
+          </div>
+          <div data-component="unitPrice"><span class="a-offscreen">£24.00</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

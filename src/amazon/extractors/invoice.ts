@@ -644,21 +644,25 @@ async function extractItems(
  * This is the most reliable method as Amazon uses consistent data-component attributes.
  *
  * Structure:
- * - [data-component="purchasedItems"] - container for each item
- *   - [data-component="itemTitle"] a - product name + ASIN from href
- *   - [data-component="unitPrice"] .a-offscreen - price
- *   - [data-component="itemCondition"] - condition text
- *   - [data-component="orderedMerchant"] a - seller name
- *   - [data-component="quantity"] - quantity (empty = 1)
- *   - [data-component="itemImage"] .od-item-view-qty span - quantity badge (alternative location)
+ * - [data-component="purchasedItems"] - container per shipment (may hold multiple items)
+ *   - .a-fixed-left-grid - one row per item, wrapping both the image (left col) and details (right col)
+ *     - .a-col-left .od-item-view-qty span - quantity badge (only present when qty > 1; absent ⇒ 1)
+ *     - [data-component="itemTitle"] a - product name + ASIN from href
+ *     - [data-component="unitPrice"] .a-offscreen - price
+ *     - [data-component="itemCondition"] - condition text
+ *     - [data-component="deliveryFrequency"] - Subscribe & Save frequency
+ *   - [data-component="orderedMerchant"] - seller (shared across items in the container)
+ *
+ * Per-item scoping by .a-fixed-left-grid is essential: when a container holds
+ * multiple items and only some have qty > 1, the qty badges no longer align
+ * positionally with the title elements across the whole container.
  */
-async function extractItemsFromDataComponents(
+export async function extractItemsFromDataComponents(
   page: Page,
   currency: string,
 ): Promise<InvoiceItem[]> {
   const items: InvoiceItem[] = [];
 
-  // Find all purchasedItems containers
   const itemContainers = await page
     .locator('[data-component="purchasedItems"]')
     .all();
@@ -669,18 +673,7 @@ async function extractItemsFromDataComponents(
 
   for (const container of itemContainers) {
     try {
-      // Get ALL item titles from this container (may have multiple for variants)
-      const titleLinks = await container
-        .locator('[data-component="itemTitle"] a')
-        .all();
-
-      console.error(
-        `[invoice] Container has ${titleLinks.length} itemTitle links`,
-      );
-
-      if (titleLinks.length === 0) continue;
-
-      // Get shared data from container (seller, etc.) - same for all items in container
+      // Seller is shared across all items in the container.
       let sharedSeller: string | undefined;
       const sellerLink = container
         .locator('[data-component="orderedMerchant"] a')
@@ -707,9 +700,20 @@ async function extractItemsFromDataComponents(
         }
       }
 
-      // Process each item title in the container
-      for (let i = 0; i < titleLinks.length; i++) {
-        const titleLink = titleLinks[i];
+      // One .a-fixed-left-grid per item; scoping all lookups to it keeps qty,
+      // price, condition and frequency bound to the correct title.
+      const itemRows = await container.locator(".a-fixed-left-grid").all();
+      console.error(
+        `[invoice] Container has ${itemRows.length} item rows (.a-fixed-left-grid)`,
+      );
+      if (itemRows.length === 0) continue;
+
+      for (let i = 0; i < itemRows.length; i++) {
+        const row = itemRows[i];
+
+        const titleLink = row.locator('[data-component="itemTitle"] a').first();
+        const titleCount = await titleLink.count().catch(() => 0);
+        if (titleCount === 0) continue;
 
         const name = await titleLink
           .textContent({ timeout: 300 })
@@ -721,78 +725,54 @@ async function extractItemsFromDataComponents(
           .catch(() => "");
         const asin = href ? extractAsinFromUrl(href) : undefined;
 
-        console.error(
-          `[invoice] Item ${i + 1}/${titleLinks.length} found: ASIN=${asin}, name=${name.slice(0, 50)}...`,
-        );
-
-        // Get price - try to get the i-th price element (prices are in same order as titles)
         let price = parseMoney("0", currency);
-        const priceElements = await container
+        const priceEl = row
           .locator('[data-component="unitPrice"] .a-offscreen')
-          .all();
-        if (priceElements.length > i) {
-          const priceText = await priceElements[i]
+          .first();
+        if ((await priceEl.count().catch(() => 0)) > 0) {
+          const priceText = await priceEl
             .textContent({ timeout: 300 })
             .catch(() => "");
-          if (priceText) {
-            price = parseMoney(priceText, currency);
-          }
-        } else if (priceElements.length > 0) {
-          // Fallback to first price if not enough prices
-          const priceText = await priceElements[0]
-            .textContent({ timeout: 300 })
-            .catch(() => "");
-          if (priceText) {
-            price = parseMoney(priceText, currency);
-          }
+          if (priceText) price = parseMoney(priceText, currency);
         }
 
-        // Get condition - try i-th element
         let condition: string | undefined;
-        const conditionElements = await container
+        const conditionEl = row
           .locator('[data-component="itemCondition"]')
-          .all();
-        if (conditionElements.length > i) {
-          const conditionText = await conditionElements[i]
+          .first();
+        if ((await conditionEl.count().catch(() => 0)) > 0) {
+          const conditionText = await conditionEl
             .textContent({ timeout: 300 })
             .catch(() => "");
           const conditionMatch = conditionText?.match(/Condition:\s*(.+)/i);
-          if (conditionMatch) {
-            condition = conditionMatch[1].trim();
-          }
+          if (conditionMatch) condition = conditionMatch[1].trim();
         }
 
-        // Get quantity - try i-th element
         let quantity = 1;
-        const qtyElements = await container
-          .locator(
-            '[data-component="itemImage"] .od-item-view-qty span, .od-item-view-qty span',
-          )
-          .all();
-        if (qtyElements.length > i) {
-          const qtyText = await qtyElements[i]
+        const qtyEl = row.locator(".od-item-view-qty span").first();
+        if ((await qtyEl.count().catch(() => 0)) > 0) {
+          const qtyText = await qtyEl
             .textContent({ timeout: 300 })
             .catch(() => "");
           const qtyMatch = qtyText?.match(/(\d+)/);
-          if (qtyMatch) {
-            quantity = parseInt(qtyMatch[1], 10);
-          }
+          if (qtyMatch) quantity = parseInt(qtyMatch[1], 10);
         }
 
-        // Get subscription frequency - try i-th element
         let subscriptionFrequency: string | undefined;
-        const freqElements = await container
+        const freqEl = row
           .locator('[data-component="deliveryFrequency"]')
-          .all();
-        if (freqElements.length > i) {
-          const freqText = await freqElements[i]
+          .first();
+        if ((await freqEl.count().catch(() => 0)) > 0) {
+          const freqText = await freqEl
             .textContent({ timeout: 300 })
             .catch(() => "");
           const freqMatch = freqText?.match(/Auto-delivered:\s*(.+)/i);
-          if (freqMatch) {
-            subscriptionFrequency = freqMatch[1].trim();
-          }
+          if (freqMatch) subscriptionFrequency = freqMatch[1].trim();
         }
+
+        console.error(
+          `[invoice] Item ${i + 1}/${itemRows.length}: ASIN=${asin}, qty=${quantity}, name=${name.slice(0, 50)}...`,
+        );
 
         items.push({
           name: name.trim(),
