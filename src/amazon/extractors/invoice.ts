@@ -66,6 +66,72 @@ export function getInvoiceUrl(orderId: string, domain: string): string {
 }
 
 /**
+ * Result of an invoice download attempt.
+ */
+export type DownloadInvoiceResult =
+  | { ok: true; path: string; bytes: number }
+  | { ok: false; error: string };
+
+/**
+ * Download an Amazon invoice as a PDF.
+ *
+ * Navigates to the print.html order-summary URL for the given order, waits
+ * for content to settle, then renders the page via page.pdf() to outputPath.
+ */
+export async function downloadInvoice(
+  page: Page,
+  orderId: string,
+  region: string,
+  outputPath: string,
+): Promise<DownloadInvoiceResult> {
+  const regionConfig = getRegionByCode(region);
+  const domain = regionConfig?.domain || "amazon.com";
+
+  const invoiceUrl = getInvoiceUrl(orderId, domain);
+  console.error(`[download-invoice] Navigating to invoice: ${invoiceUrl}`);
+
+  await page.goto(invoiceUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 15000,
+  });
+
+  const currentUrl = page.url();
+  if (currentUrl.includes("signin") || currentUrl.includes("ap/signin")) {
+    return {
+      ok: false,
+      error: "Redirected to sign-in - authentication required",
+    };
+  }
+  if (
+    currentUrl.includes("order-history") ||
+    currentUrl.includes("your-orders")
+  ) {
+    return {
+      ok: false,
+      error: `Redirected to order history - invoice URL not valid for order ${orderId} (cancelled, deleted, or wrong region?)`,
+    };
+  }
+
+  await page
+    .waitForSelector('[data-component="purchasedItems"], table, .a-box', {
+      timeout: 5000,
+    })
+    .catch(() => {});
+
+  const pdfBuffer = await page.pdf({
+    format: "A4",
+    printBackground: true,
+    path: outputPath,
+  });
+
+  console.error(
+    `[download-invoice] Wrote ${pdfBuffer.length} bytes to ${outputPath}`,
+  );
+
+  return { ok: true, path: outputPath, bytes: pdfBuffer.length };
+}
+
+/**
  * Extract all data from invoice page.
  * This is much faster than the order detail page as it has cleaner HTML.
  */

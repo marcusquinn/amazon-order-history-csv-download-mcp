@@ -36,6 +36,7 @@ import {
   extractGiftCardData,
   GiftCardData,
 } from "./amazon/extractors/gift-card";
+import { downloadInvoice } from "./amazon/extractors/invoice";
 
 // Initialize the Amazon plugin
 const amazonPlugin = new AmazonPlugin();
@@ -499,6 +500,32 @@ const tools: Tool[] = [
         },
       },
       required: ["region"],
+    },
+  },
+  {
+    name: "download_amazon_invoice",
+    description:
+      "Download an Amazon invoice (order-summary print page) as a PDF file. Navigates to the print.html invoice URL for the specified order, waits for the page to render, and writes a PDF to disk via page.pdf(). Returns the saved file path and byte count. Returns an error if the URL redirects to sign-in (session lost) or order-history (cancelled / invalid order).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        order_id: {
+          type: "string",
+          description:
+            "Amazon order ID in format XXX-XXXXXXX-XXXXXXX (e.g., 123-4567890-1234567)",
+        },
+        region: {
+          type: "string",
+          description: "Amazon region code where the order was placed",
+          enum: getRegionCodes(),
+        },
+        output_path: {
+          type: "string",
+          description:
+            "Full path to save the PDF. Defaults to ~/Downloads/amazon-{region}-invoice-{orderId}.pdf",
+        },
+      },
+      required: ["order_id", "region"],
     },
   },
 ];
@@ -1346,6 +1373,84 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     maxPages,
                   },
                   ...exportData,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      case "download_amazon_invoice": {
+        const regionParam = args?.region as string | undefined;
+        const regionError = validateRegion(regionParam, args);
+        if (regionError) return regionError;
+        const region = regionParam!;
+
+        const orderId = args?.order_id as string;
+        if (!orderId) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  { error: "order_id parameter is required" },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const outputPath =
+          (args?.output_path as string | undefined) ||
+          join(
+            homedir(),
+            "Downloads",
+            `amazon-${region}-invoice-${orderId}.pdf`,
+          );
+
+        const currentPage = await getPage();
+        const result = await downloadInvoice(
+          currentPage,
+          orderId,
+          region,
+          outputPath,
+        );
+
+        if (!result.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    status: "error",
+                    params: { orderId, region, outputPath },
+                    error: result.error,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "success",
+                  params: { orderId, region },
+                  path: result.path,
+                  bytes: result.bytes,
                 },
                 null,
                 2,
