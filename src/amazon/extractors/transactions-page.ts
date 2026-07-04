@@ -10,9 +10,21 @@
 
 import { Page } from "playwright";
 import { Transaction } from "../../core/types/transaction";
-import { parseMoney } from "../../core/types/money";
+import { parseMoney, getCurrencySymbol } from "../../core/types/money";
 import { parseDate } from "../../core/utils/date";
 import { getRegionByCode } from "../regions";
+
+/**
+ * Parse an amount from the transactions page, trusting the region's currency.
+ * The page always displays amounts in the region's currency, but bare "$"
+ * symbols would otherwise be interpreted as USD (e.g. on amazon.com.au).
+ */
+function parseRegionMoney(formatted: string, currency: string) {
+  const money = parseMoney(formatted, currency);
+  money.currency = currency;
+  money.currencySymbol = getCurrencySymbol(currency);
+  return money;
+}
 
 /**
  * Get transactions page URL for a region.
@@ -47,10 +59,10 @@ export async function extractTransactionsFromPage(
   onProgress?.("Loading transactions page...", 0);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-  // Wait for transactions to load
+  // Wait for transactions to load (current "apx" structure or legacy selectors)
   await page
     .waitForSelector(
-      '[data-testid="transaction-link"], .transaction-date-container, .transactions-line-item',
+      '.apx-transactions-line-item-component-container, [data-testid="transaction-link"], .transaction-date-container, .transactions-line-item',
       { timeout: 10000 },
     )
     .catch(() => {});
@@ -59,12 +71,14 @@ export async function extractTransactionsFromPage(
   await page.waitForTimeout(1000);
 
   let allTransactions: Transaction[] = [];
+  let pageCount = 0;
   let previousCount = 0;
-  let scrollCount = 0;
   let stableCount = 0;
 
-  // Scroll to load all transactions
-  while (scrollCount < maxScrolls) {
+  // The transactions page is paginated (Previous/Next page buttons).
+  // Walk pages until there's no enabled Next button, we pass the start date,
+  // or we hit the page limit (reuses maxScrolls as a page cap).
+  while (pageCount < maxScrolls) {
     // Extract current transactions
     const pageTransactions = await extractVisibleTransactions(page, currency);
 
@@ -76,20 +90,25 @@ export async function extractTransactionsFromPage(
       allTransactions.length,
     );
 
-    // Check if we've stopped finding new transactions
+    if (pageTransactions.length === 0) {
+      // Nothing extracted on this page - no point paginating further
+      break;
+    }
+
+    // Stop if nothing new turned up for several rounds (guards the legacy
+    // infinite-scroll path, which has no reliable "last page" signal)
     if (allTransactions.length === previousCount) {
       stableCount++;
       if (stableCount >= 3) {
-        // No new transactions after 3 scroll attempts
         break;
       }
     } else {
       stableCount = 0;
     }
-
     previousCount = allTransactions.length;
 
     // Check date range - stop if we've gone past the start date
+    // (transactions are listed newest-first)
     if (startDate && allTransactions.length > 0) {
       const oldestDate = Math.min(
         ...allTransactions.map((t) => t.date.getTime()),
@@ -99,13 +118,19 @@ export async function extractTransactionsFromPage(
       }
     }
 
-    // Scroll down to load more
-    await scrollToLoadMore(page);
-    scrollCount++;
-
-    // Wait for new content
-    await page.waitForTimeout(500);
+    // Move to the next page if there is one
+    const advanced = await goToNextPage(page);
+    if (!advanced) {
+      break;
+    }
+    pageCount++;
   }
+
+  // Drop rows scraped off Amazon error banners ("There was a problem")
+  // rather than real transaction line items
+  allTransactions = allTransactions.filter(
+    (t) => !/there was a problem/i.test(t.vendor),
+  );
 
   // Filter by date range if specified
   let filteredTransactions = allTransactions;
@@ -136,8 +161,14 @@ async function extractVisibleTransactions(
   page: Page,
   currency: string,
 ): Promise<Transaction[]> {
-  // Try Strategy 0 (transaction-date-container based)
-  let transactions = await extractStrategy0(page, currency);
+  // Try the current Amazon structure first (apx-prefixed classes, 2025+)
+  let transactions = await extractStrategyApx(page, currency);
+  if (transactions.length > 0) {
+    return transactions;
+  }
+
+  // Try Strategy 0 (legacy transaction-date-container based)
+  transactions = await extractStrategy0(page, currency);
   if (transactions.length > 0) {
     return transactions;
   }
@@ -150,6 +181,146 @@ async function extractVisibleTransactions(
 
   // Fallback: generic extraction
   return extractGeneric(page, currency);
+}
+
+/**
+ * Current strategy: extract from the apx-* component structure (2025+).
+ *
+ * Page layout:
+ *   .apx-transaction-date-container            <- "28 June 2026"
+ *   .a-section                                 <- sibling holding that date's items
+ *     .apx-transactions-line-item-component-container   <- one per transaction
+ *       row: payment method ("Visa ****1234") + amount ("-$47.99")
+ *       row (optional): status ("Pending")
+ *       row: order link  <a href="...orderID=xxx">Order #xxx</a>
+ *       row (optional): vendor ("Amazon AU", "Audible Limited (AU)", ...)
+ *
+ * Walks date containers and line items in document order in a single
+ * page.evaluate, tracking the current date as it goes.
+ */
+async function extractStrategyApx(
+  page: Page,
+  currency: string,
+): Promise<Transaction[]> {
+  interface RawApxTransaction {
+    dateText: string;
+    amountText: string;
+    cardInfo: string;
+    orderIds: string[];
+    vendor: string;
+    status: string;
+  }
+
+  const rawTransactions: RawApxTransaction[] = await page.evaluate(() => {
+    const STATUS_RE = /^(Pending|Completed|In progress|Charged|Refunded)$/i;
+    const results: Array<{
+      dateText: string;
+      amountText: string;
+      cardInfo: string;
+      orderIds: string[];
+      vendor: string;
+      status: string;
+    }> = [];
+
+    // tsconfig has no "dom" lib (this file otherwise runs in Node); the
+    // callback executes in the browser, so reach the DOM via untyped globals
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const doc = (globalThis as any).document;
+    const nodes: any[] = Array.from(
+      doc.querySelectorAll(
+        ".apx-transaction-date-container, .apx-transactions-line-item-component-container",
+      ),
+    );
+    let currentDate = "";
+
+    for (const node of nodes) {
+      if (node.classList.contains("apx-transaction-date-container")) {
+        currentDate = (node.textContent || "").trim();
+        continue;
+      }
+
+      // Line item
+      const orderIds: string[] = [];
+      const anchors: any[] = Array.from(
+        node.querySelectorAll('a[href*="orderID="]'),
+      );
+      for (const a of anchors) {
+        const href = a.getAttribute("href") || "";
+        const m = href.match(/orderID=([A-Z0-9-]+)/i);
+        if (m) orderIds.push(m[1]);
+      }
+      // Fallback: order IDs in plain text
+      if (orderIds.length === 0) {
+        const text = node.textContent || "";
+        const matches = text.match(/[A-Z]?\d{2,3}-\d{7}-\d{7}/g);
+        if (matches) orderIds.push(...matches);
+      }
+
+      let amountText = "";
+      let cardInfo = "";
+      let vendor = "";
+      let status = "";
+
+      const spans: any[] = Array.from(node.querySelectorAll("span"));
+      for (const span of spans) {
+        const text = (span.textContent || "").trim();
+        if (!text) continue;
+
+        const isBold = span.classList.contains("a-text-bold");
+        const inAmountColumn = !!span.closest(".a-text-right");
+
+        if (inAmountColumn && isBold && !amountText) {
+          amountText = text;
+        } else if (isBold && !cardInfo) {
+          cardInfo = text;
+        } else if (STATUS_RE.test(text) && !status) {
+          status = text;
+        } else if (!isBold && !text.startsWith("Order #") && !vendor) {
+          vendor = text;
+        }
+      }
+
+      results.push({
+        dateText: currentDate,
+        amountText,
+        cardInfo,
+        orderIds,
+        vendor,
+        status,
+      });
+    }
+
+    return results;
+  });
+
+  const transactions: Transaction[] = [];
+  for (const raw of rawTransactions) {
+    const date = parseDate(raw.dateText);
+    if (!date) {
+      console.error(
+        `[transactions-page] apx: could not parse date "${raw.dateText}"`,
+      );
+      continue;
+    }
+
+    transactions.push({
+      date,
+      orderIds: [...new Set(raw.orderIds)],
+      amount: parseRegionMoney(raw.amountText || "0", currency),
+      cardInfo: raw.cardInfo,
+      vendor: raw.vendor,
+      platformData: {
+        source: "transactions-page",
+        status: raw.status || undefined,
+        isRefund: raw.amountText.trim().startsWith("+"),
+      },
+    });
+  }
+
+  console.error(
+    `[transactions-page] apx strategy: extracted ${transactions.length} transactions`,
+  );
+  return transactions;
 }
 
 /**
@@ -289,11 +460,11 @@ async function extractStrategy1(
         (await link.textContent({ timeout: 300 }).catch(() => "")) || "";
       // Match amounts like "-£47.64", "+£93.59", "£1,399.13"
       const amountMatch = fullText.match(/([+-])?\s*([£$€])\s*([\d,]+\.?\d*)/);
-      let amount = parseMoney("0", currency);
+      let amount = parseRegionMoney("0", currency);
       if (amountMatch) {
         const sign = amountMatch[1] === "+" ? "" : "-";
         const amountStr = `${sign}${amountMatch[2]}${amountMatch[3]}`;
-        amount = parseMoney(amountStr, currency);
+        amount = parseRegionMoney(amountStr, currency);
       }
 
       // Determine if refund based on amount sign or status text
@@ -388,8 +559,8 @@ async function extractTransactionItem(
       itemText.match(/([$£€¥]|USD|GBP|EUR|CAD|AUD)\s*([\d,]+\.?\d*)/i) ||
       itemText.match(/([\d,]+\.?\d*)\s*([$£€¥]|USD|GBP|EUR|CAD|AUD)/i);
     const amount = amountMatch
-      ? parseMoney(amountMatch[0], currency)
-      : parseMoney("0", currency);
+      ? parseRegionMoney(amountMatch[0], currency)
+      : parseRegionMoney("0", currency);
 
     // Extract card info (e.g., "Visa ****1234" or "ending in 1234")
     const cardMatch =
@@ -465,8 +636,8 @@ function parseTransactionText(
     text.match(/([$£€¥])\s*([\d,]+\.?\d*)/) ||
     text.match(/([\d,]+\.?\d*)\s*([$£€¥])/);
   const amount = amountMatch
-    ? parseMoney(amountMatch[0], currency)
-    : parseMoney("0", currency);
+    ? parseRegionMoney(amountMatch[0], currency)
+    : parseRegionMoney("0", currency);
 
   // Extract card info
   const cardMatch =
@@ -499,10 +670,38 @@ function parseTransactionText(
 }
 
 /**
- * Scroll to load more transactions.
+ * Advance to the next page of transactions.
+ * Returns true if navigation happened, false if there is no next page.
+ *
+ * The paginated page uses a form-submit button:
+ *   <input name="ppw-widgetEvent:DefaultNextPageNavigationEvent:..." type="submit">
+ * (disabled buttons have no such input / carry the disabled attribute).
+ * Falls back to scrolling for legacy infinite-scroll layouts.
  */
-async function scrollToLoadMore(page: Page): Promise<void> {
-  // Find the last transaction element and scroll it into view
+async function goToNextPage(page: Page): Promise<boolean> {
+  const nextButton = page.locator(
+    'input[name*="DefaultNextPageNavigationEvent"]:not([disabled])',
+  );
+
+  const count = await nextButton.count().catch(() => 0);
+  if (count > 0) {
+    await Promise.all([
+      page
+        .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30000 })
+        .catch(() => {}),
+      nextButton.first().click(),
+    ]);
+    // Wait for the new page's transactions to render
+    await page
+      .waitForSelector(".apx-transactions-line-item-component-container", {
+        timeout: 10000,
+      })
+      .catch(() => {});
+    await page.waitForTimeout(500);
+    return true;
+  }
+
+  // Legacy infinite-scroll layout: scroll the last item into view
   const lastTransaction = page
     .locator('[data-testid="transaction-link"], .transactions-line-item')
     .last();
@@ -510,10 +709,11 @@ async function scrollToLoadMore(page: Page): Promise<void> {
   const exists = await lastTransaction.count().catch(() => 0);
   if (exists > 0) {
     await lastTransaction.scrollIntoViewIfNeeded().catch(() => {});
-  } else {
-    // Fallback: use keyboard to scroll down
-    await page.keyboard.press("End");
+    await page.waitForTimeout(500);
+    return true;
   }
+
+  return false;
 }
 
 /**
