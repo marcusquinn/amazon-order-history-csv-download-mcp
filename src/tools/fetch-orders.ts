@@ -535,76 +535,126 @@ export async function fetchOrders(
       return result;
     }
 
-    // Build order list URL (for multi-order fetch)
-    const listUrl = plugin.getOrderListUrl(region, {
-      year,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-    });
-
-    // Navigate to order list
-    console.error(`[fetch-orders] Navigating to: ${listUrl}`);
-    onProgress?.("Navigating to order history...", 0, 0);
-    await page.goto(listUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    // Wait for order cards to appear (more reliable than fixed timeout)
-    await page
-      .waitForSelector('.order-card, [class*="order-card"], .a-box-group', {
-        timeout: 3000,
-      })
-      .catch(() => {});
-    console.error(`[fetch-orders] Page loaded, URL: ${page.url()}`);
-
-    // Check authentication
-    console.error(`[fetch-orders] Checking auth...`);
-    const authStatus = await plugin.checkAuthStatus(page, region);
-    console.error(`[fetch-orders] Auth result: ${JSON.stringify(authStatus)}`);
-    if (!authStatus.authenticated) {
-      result.errors.push(`Not authenticated: ${authStatus.message}`);
-      return result;
+    // Determine which years to fetch.
+    // Amazon's order history URL only supports year-YYYY or months-N filters,
+    // so cross-year date ranges must be split into per-year requests.
+    const yearsToFetch: Array<number | undefined> = [];
+    if (year) {
+      yearsToFetch.push(year);
+    } else if (startDate || endDate) {
+      const sy = startDate
+        ? new Date(startDate).getFullYear()
+        : new Date().getFullYear();
+      const ey = endDate
+        ? new Date(endDate).getFullYear()
+        : new Date().getFullYear();
+      for (let y = sy; y <= ey; y++) yearsToFetch.push(y);
+    } else {
+      yearsToFetch.push(undefined); // default: Amazon shows recent orders
     }
 
-    // Extract orders from all pages
-    let pageNum = 1;
-    let hasMore = true;
+    console.error(
+      `[fetch-orders] Years to fetch: ${yearsToFetch.map((y) => y ?? "default").join(", ")}`,
+    );
 
-    while (hasMore) {
-      console.error(`[fetch-orders] Extracting page ${pageNum}...`);
+    for (const fetchYear of yearsToFetch) {
+      // Build order list URL for this year
+      const listUrl = plugin.getOrderListUrl(region, {
+        year: fetchYear,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+      });
+
+      // Navigate to order list
+      console.error(`[fetch-orders] Navigating to: ${listUrl}`);
       onProgress?.(
-        `Extracting orders from page ${pageNum}...`,
-        result.orders.length,
+        `Navigating to order history${fetchYear ? ` (${fetchYear})` : ""}...`,
+        0,
         0,
       );
+      await page.goto(listUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
+      // Wait for order cards to appear (more reliable than fixed timeout)
+      await page
+        .waitForSelector('.order-card, [class*="order-card"], .a-box-group', {
+          timeout: 3000,
+        })
+        .catch(() => {});
+      console.error(`[fetch-orders] Page loaded, URL: ${page.url()}`);
 
-      // Extract order headers from current page
-      const pageHeaders = await extractOrderHeaders(page, region);
+      // Check authentication
+      console.error(`[fetch-orders] Checking auth...`);
+      const authStatus = await plugin.checkAuthStatus(page, region);
       console.error(
-        `[fetch-orders] Found ${pageHeaders.length} orders on page ${pageNum}`,
+        `[fetch-orders] Auth result: ${JSON.stringify(authStatus)}`,
       );
-      // Cast to the enriched type for result storage
-      result.orders.push(...(pageHeaders as EnrichedOrder[]));
-      onProgress?.(
-        `Found ${result.orders.length} orders (page ${pageNum})...`,
-        result.orders.length,
-        0,
-      );
-
-      // Check if we've hit the max
-      if (maxOrders && result.orders.length >= maxOrders) {
-        result.orders = result.orders.slice(0, maxOrders);
-        break;
+      if (!authStatus.authenticated) {
+        result.errors.push(`Not authenticated: ${authStatus.message}`);
+        return result;
       }
 
-      // Check for next page
-      hasMore = await hasNextPage(page);
-      console.error(`[fetch-orders] Has next page: ${hasMore}`);
-      if (hasMore && result.orders.length < (maxOrders || 1000)) {
-        const navigated = await goToNextPage(page);
-        console.error(`[fetch-orders] Navigated to next: ${navigated}`);
-        if (!navigated) break;
-        pageNum++;
-      } else {
-        hasMore = false;
+      // Extract orders from all pages for this year
+      let pageNum = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        console.error(`[fetch-orders] Extracting page ${pageNum}...`);
+        onProgress?.(
+          `Extracting orders from page ${pageNum}${fetchYear ? ` (${fetchYear})` : ""}...`,
+          result.orders.length,
+          0,
+        );
+
+        // Extract order headers from current page
+        const pageHeaders = await extractOrderHeaders(page, region);
+        console.error(
+          `[fetch-orders] Found ${pageHeaders.length} orders on page ${pageNum}`,
+        );
+        // Cast to the enriched type for result storage
+        result.orders.push(...(pageHeaders as EnrichedOrder[]));
+        onProgress?.(
+          `Found ${result.orders.length} orders (page ${pageNum}${fetchYear ? `, ${fetchYear}` : ""})...`,
+          result.orders.length,
+          0,
+        );
+
+        // Check if we've hit the max
+        if (maxOrders && result.orders.length >= maxOrders) {
+          result.orders = result.orders.slice(0, maxOrders);
+          break;
+        }
+
+        // Check for next page
+        hasMore = await hasNextPage(page);
+        console.error(`[fetch-orders] Has next page: ${hasMore}`);
+        if (hasMore && result.orders.length < (maxOrders || 1000)) {
+          const navigated = await goToNextPage(page);
+          console.error(`[fetch-orders] Navigated to next: ${navigated}`);
+          if (!navigated) break;
+          pageNum++;
+        } else {
+          hasMore = false;
+        }
       }
+    }
+
+    // Filter orders to the requested date range (if any).
+    // Necessary because per-year fetches include all orders for that year,
+    // but the caller may have requested a narrower range within the year.
+    if (startDate || endDate) {
+      const sd = startDate ? new Date(startDate) : new Date(0);
+      const ed = endDate ? new Date(endDate) : new Date("2099-12-31");
+      const beforeFilter = result.orders.length;
+      result.orders = result.orders.filter((o) => {
+        if (!o.date) return true;
+        const d = new Date(o.date);
+        return d >= sd && d <= ed;
+      });
+      console.error(
+        `[fetch-orders] Date filter: ${beforeFilter} → ${result.orders.length} orders (${startDate ?? "*"} to ${endDate ?? "*"})`,
+      );
     }
 
     result.totalFound = result.orders.length;
