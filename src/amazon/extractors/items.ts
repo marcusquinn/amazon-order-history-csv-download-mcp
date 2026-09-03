@@ -8,7 +8,8 @@ import { Locator, Page } from 'playwright';
 import { appendFileSync } from 'fs';
 import { Item, extractAsinFromUrl } from '../../core/types/item';
 import { OrderHeader } from '../../core/types/order';
-import { Money, parseMoney } from '../../core/types/money';
+import { parseMoney } from '../../core/types/money';
+import type { Money } from '../../core/types/money';
 import { getRegionByCode } from '../regions';
 
 function debug(msg: string): void {
