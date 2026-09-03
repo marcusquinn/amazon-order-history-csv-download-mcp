@@ -1,6 +1,6 @@
 #!/bin/bash
 # Amazon Order History CSV Download MCP - Setup Script
-# Version: 0.3.0
+# Version: 0.4.1
 
 set -e
 
