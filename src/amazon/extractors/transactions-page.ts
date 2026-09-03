@@ -23,7 +23,7 @@ interface BrowserElement {
 }
 
 interface BrowserDocument {
-  querySelectorAll: (selector: string) => BrowserElement[];
+  querySelectorAll: (selector: string) => ArrayLike<BrowserElement>;
 }
 
 interface BrowserWindow {
@@ -67,7 +67,7 @@ export function getTransactionsPageUrl(region: string): string {
 
 /**
  * Extract all transactions from the transactions page.
- * Uses scrolling to load all transactions (Amazon lazy-loads them).
+ * Uses page navigation for APX layouts and scrolling for legacy layouts.
  */
 export async function extractTransactionsFromPage(
   page: Page,
@@ -235,8 +235,7 @@ async function extractStrategyApx(
   const rawTransactions: RawApxTransaction[] = await page.evaluate(() => {
     const STATUS_RE = /^(Pending|Completed|In progress|Charged|Refunded)$/i;
     const getOrderIds = (item: BrowserElement): string[] => {
-      const orderIds = item
-        .querySelectorAll('a[href*="orderID="]');
+      const orderIds = item.querySelectorAll('a[href*="orderID="]');
       const matchedOrderIds = Array.from(orderIds)
         .map((anchor) => anchor.getAttribute("href") || "")
         .map((href) => href.match(/orderID=([A-Z0-9-]+)/i)?.[1])
@@ -244,9 +243,7 @@ async function extractStrategyApx(
 
       if (matchedOrderIds.length > 0) return matchedOrderIds;
 
-      return (
-        item.textContent?.match(/[A-Z]?\d{2,3}-\d{7}-\d{7}/g) || []
-      );
+      return item.textContent?.match(/[A-Z]?\d{2,3}-\d{7}-\d{7}/g) || [];
     };
 
     const getTransactionFields = (
@@ -701,22 +698,23 @@ async function goToNextPage(page: Page): Promise<boolean> {
     };
 
     try {
-      const pageTransition = page.waitForFunction(
-        (previous) => {
-          const browserWindow = globalThis as unknown as BrowserWindow;
-          const currentRows = Array.from(
-            browserWindow.document.querySelectorAll(APX_TRANSACTION_SELECTOR),
-          ).map((row) => row.textContent?.trim() || "");
-          return (
-            browserWindow.location.href !== previous.url ||
-            currentRows.join("\n") !== previous.rows.join("\n")
-          );
-        },
-        previousPage,
-        { timeout: APX_PAGE_TRANSITION_TIMEOUT_MS },
-      );
-      await nextButton.first().click({ noWaitAfter: true });
-      await pageTransition;
+      await Promise.all([
+        page.waitForFunction(
+          (previous: { url: string; rows: string[]; selector: string }) => {
+            const browserWindow = globalThis as unknown as BrowserWindow;
+            const currentRows = Array.from(
+              browserWindow.document.querySelectorAll(previous.selector),
+            ).map((row) => row.textContent?.trim() || "");
+            return (
+              browserWindow.location.href !== previous.url ||
+              currentRows.join("\n") !== previous.rows.join("\n")
+            );
+          },
+          { ...previousPage, selector: APX_TRANSACTION_SELECTOR },
+          { timeout: APX_PAGE_TRANSITION_TIMEOUT_MS },
+        ),
+        nextButton.first().click({ noWaitAfter: true }),
+      ]);
       return true;
     } catch {
       return false;

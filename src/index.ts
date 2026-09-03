@@ -402,7 +402,7 @@ const tools: Tool[] = [
   {
     name: "get_amazon_transactions",
     description:
-      "Fetch all Amazon payment transactions from the dedicated transactions page. Faster than per-order extraction as it scrapes the infinite-scroll transactions list. Returns: date, order IDs, amount, payment method, card info (last 4 digits), vendor. Useful for reconciling payments, tracking spending, or exporting for accounting.",
+      "Fetch all Amazon payment transactions from the dedicated transactions page. Faster than per-order extraction and supports both paginated and legacy infinite-scroll layouts. Returns: date, order IDs, amount, payment method, card info (last 4 digits), vendor. Useful for reconciling payments, tracking spending, or exporting for accounting.",
     inputSchema: {
       type: "object",
       properties: {
@@ -422,7 +422,7 @@ const tools: Tool[] = [
         max_scrolls: {
           type: "number",
           description:
-            "Maximum scroll attempts to load more transactions. Default: 50. Increase for longer history.",
+            "Maximum page or scroll advances used to load transactions. Default: 50. Increase for longer history.",
         },
       },
       required: ["region"],
