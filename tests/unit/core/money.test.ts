@@ -105,6 +105,12 @@ describe("money parsing", () => {
     });
 
     describe("negative amounts", () => {
+      test("parses +$12.34 as a positive amount", () => {
+        const money = parseMoney("+$12.34");
+        expect(money.amount).toBe(12.34);
+        expect(money.currency).toBe("USD");
+      });
+
       test("parses -$12.34", () => {
         const money = parseMoney("-$12.34");
         expect(money.amount).toBe(-12.34);

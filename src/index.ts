@@ -56,11 +56,21 @@ const BROWSER_DATA_DIR = join(
  */
 async function getBrowserContext(): Promise<BrowserContext> {
   if (!browserContext) {
-    browserContext = await chromium.launchPersistentContext(BROWSER_DATA_DIR, {
+    const context = await chromium.launchPersistentContext(BROWSER_DATA_DIR, {
       headless: false, // Need visible browser for login
       viewport: { width: 1280, height: 800 },
       userAgent:
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    });
+    browserContext = context;
+    // If the browser dies (crash, user closes the window, killed externally),
+    // drop the stale handle so the next tool call relaunches instead of
+    // failing forever with "browser has been closed"
+    context.on("close", () => {
+      if (browserContext === context) {
+        browserContext = null;
+        page = null;
+      }
     });
   }
   return browserContext;
@@ -70,12 +80,22 @@ async function getBrowserContext(): Promise<BrowserContext> {
  * Get or create page instance.
  */
 async function getPage(): Promise<Page> {
-  const context = await getBrowserContext();
-  if (!page || page.isClosed()) {
-    const pages = context.pages();
-    page = pages[0] || (await context.newPage());
+  try {
+    const context = await getBrowserContext();
+    if (!page || page.isClosed()) {
+      const pages = context.pages();
+      page = pages[0] || (await context.newPage());
+    }
+    return page;
+  } catch (e) {
+    // Stale context (browser died without firing 'close') - relaunch once
+    console.error(`[browser] Relaunching after error: ${e}`);
+    browserContext = null;
+    page = null;
+    const context = await getBrowserContext();
+    page = context.pages()[0] || (await context.newPage());
+    return page;
   }
-  return page;
 }
 
 /**
