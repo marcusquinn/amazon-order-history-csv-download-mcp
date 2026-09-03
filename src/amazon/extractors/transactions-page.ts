@@ -28,7 +28,6 @@ interface BrowserDocument {
 
 interface BrowserWindow {
   document: BrowserDocument;
-  location: { href: string };
 }
 
 interface RawApxTransaction {
@@ -693,20 +692,19 @@ async function goToNextPage(page: Page): Promise<boolean> {
   const count = await nextButton.count().catch(() => 0);
   if (count > 0) {
     const previousPage = {
-      url: page.url(),
       rows: await page.locator(APX_TRANSACTION_SELECTOR).allTextContents(),
     };
 
     try {
       await Promise.all([
         page.waitForFunction(
-          (previous: { url: string; rows: string[]; selector: string }) => {
+          (previous: { rows: string[]; selector: string }) => {
             const browserWindow = globalThis as unknown as BrowserWindow;
             const currentRows = Array.from(
               browserWindow.document.querySelectorAll(previous.selector),
             ).map((row) => row.textContent?.trim() || "");
             return (
-              browserWindow.location.href !== previous.url ||
+              currentRows.length > 0 &&
               currentRows.join("\n") !== previous.rows.join("\n")
             );
           },
