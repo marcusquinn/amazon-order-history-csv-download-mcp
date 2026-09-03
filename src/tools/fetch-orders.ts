@@ -679,6 +679,7 @@ export async function fetchOrders(
       );
       if (!authStatus.authenticated) {
         appendInvalidDateSummary();
+        result.totalFound = result.orders.length;
         result.errors.push(`Not authenticated: ${authStatus.message}`);
         return result;
       }
