@@ -95,6 +95,57 @@ export interface FetchOrdersResult {
   errors: string[];
 }
 
+interface ParsedDateBound {
+  year: number;
+  value: number;
+}
+
+function parseIsoDateBound(value: string): ParsedDateBound | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const parsedYear = Number(match[1]);
+  const parsedMonth = Number(match[2]);
+  const parsedDay = Number(match[3]);
+  const isLeapYear =
+    parsedYear % 4 === 0 && (parsedYear % 100 !== 0 || parsedYear % 400 === 0);
+  const daysByMonth = [
+    31,
+    isLeapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+
+  if (
+    parsedYear < 1 ||
+    parsedMonth < 1 ||
+    parsedMonth > 12 ||
+    parsedDay < 1 ||
+    parsedDay > daysByMonth[parsedMonth - 1]
+  ) {
+    return null;
+  }
+
+  return {
+    year: parsedYear,
+    value: parsedYear * 10000 + parsedMonth * 100 + parsedDay,
+  };
+}
+
+function dateValue(date: Date): number {
+  return (
+    date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()
+  );
+}
+
 /**
  * Fetch orders from Amazon.
  */
@@ -134,6 +185,37 @@ export async function fetchOrders(
     );
     return result;
   }
+
+  const hasStartDate = startDate !== undefined;
+  const hasEndDate = endDate !== undefined;
+  const parsedStartDate = hasStartDate
+    ? parseIsoDateBound(startDate)
+    : undefined;
+  const parsedEndDate = hasEndDate ? parseIsoDateBound(endDate) : undefined;
+
+  if (hasStartDate && !parsedStartDate) {
+    result.errors.push(
+      `Invalid start date: ${startDate}. Expected a valid date in YYYY-MM-DD format.`,
+    );
+  }
+  if (hasEndDate && !parsedEndDate) {
+    result.errors.push(
+      `Invalid end date: ${endDate}. Expected a valid date in YYYY-MM-DD format.`,
+    );
+  }
+  if (result.errors.length > 0) return result;
+
+  if (
+    parsedStartDate &&
+    parsedEndDate &&
+    parsedStartDate.value > parsedEndDate.value
+  ) {
+    result.errors.push(
+      `Invalid date range: start date ${startDate} is after end date ${endDate}.`,
+    );
+    return result;
+  }
+
   const domain = regionConfig.domain;
   const currency = regionConfig.currency || "USD";
   const currencySymbol =
@@ -535,78 +617,139 @@ export async function fetchOrders(
       return result;
     }
 
-    // Build order list URL (for multi-order fetch)
-    const listUrl = plugin.getOrderListUrl(region, {
-      year,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-    });
+    const isDateBounded = hasStartDate || hasEndDate;
+    const years: number[] = [];
 
-    // Navigate to order list
-    console.error(`[fetch-orders] Navigating to: ${listUrl}`);
-    onProgress?.("Navigating to order history...", 0, 0);
-    await page.goto(listUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    // Wait for order cards to appear (more reliable than fixed timeout)
-    await page
-      .waitForSelector('.order-card, [class*="order-card"], .a-box-group', {
-        timeout: 3000,
-      })
-      .catch(() => {});
-    console.error(`[fetch-orders] Page loaded, URL: ${page.url()}`);
-
-    // Check authentication
-    console.error(`[fetch-orders] Checking auth...`);
-    const authStatus = await plugin.checkAuthStatus(page, region);
-    console.error(`[fetch-orders] Auth result: ${JSON.stringify(authStatus)}`);
-    if (!authStatus.authenticated) {
-      result.errors.push(`Not authenticated: ${authStatus.message}`);
-      return result;
+    if (parsedStartDate && parsedEndDate) {
+      for (
+        let requestedYear = parsedEndDate.year;
+        requestedYear >= parsedStartDate.year;
+        requestedYear--
+      ) {
+        years.push(requestedYear);
+      }
+    } else if (parsedStartDate) {
+      for (
+        let requestedYear = new Date().getFullYear();
+        requestedYear >= parsedStartDate.year;
+        requestedYear--
+      ) {
+        years.push(requestedYear);
+      }
+    } else if (parsedEndDate) {
+      years.push(parsedEndDate.year);
+    } else {
+      years.push(year ?? new Date().getFullYear());
     }
 
-    // Extract orders from all pages
-    let pageNum = 1;
-    let hasMore = true;
+    let excludedInvalidDateCount = 0;
+    let reachedLimit = false;
+    const appendInvalidDateSummary = (): void => {
+      if (excludedInvalidDateCount > 0) {
+        result.errors.push(
+          `Excluded ${excludedInvalidDateCount} order${excludedInvalidDateCount === 1 ? "" : "s"} with missing or invalid dates from the bounded result.`,
+        );
+      }
+    };
 
-    while (hasMore) {
-      console.error(`[fetch-orders] Extracting page ${pageNum}...`);
+    for (const requestedYear of years) {
+      const listUrl = plugin.getOrderListUrl(region, { year: requestedYear });
+
+      console.error(`[fetch-orders] Navigating to: ${listUrl}`);
       onProgress?.(
-        `Extracting orders from page ${pageNum}...`,
+        `Navigating to ${requestedYear} order history...`,
         result.orders.length,
         0,
       );
+      await page.goto(listUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
+      await page
+        .waitForSelector('.order-card, [class*="order-card"], .a-box-group', {
+          timeout: 3000,
+        })
+        .catch(() => {});
+      console.error(`[fetch-orders] Page loaded, URL: ${page.url()}`);
 
-      // Extract order headers from current page
-      const pageHeaders = await extractOrderHeaders(page, region);
+      console.error(`[fetch-orders] Checking auth...`);
+      const authStatus = await plugin.checkAuthStatus(page, region);
       console.error(
-        `[fetch-orders] Found ${pageHeaders.length} orders on page ${pageNum}`,
+        `[fetch-orders] Auth result: ${JSON.stringify(authStatus)}`,
       );
-      // Cast to the enriched type for result storage
-      result.orders.push(...(pageHeaders as EnrichedOrder[]));
-      onProgress?.(
-        `Found ${result.orders.length} orders (page ${pageNum})...`,
-        result.orders.length,
-        0,
-      );
-
-      // Check if we've hit the max
-      if (maxOrders && result.orders.length >= maxOrders) {
-        result.orders = result.orders.slice(0, maxOrders);
-        break;
+      if (!authStatus.authenticated) {
+        appendInvalidDateSummary();
+        result.errors.push(`Not authenticated: ${authStatus.message}`);
+        return result;
       }
 
-      // Check for next page
-      hasMore = await hasNextPage(page);
-      console.error(`[fetch-orders] Has next page: ${hasMore}`);
-      if (hasMore && result.orders.length < (maxOrders || 1000)) {
-        const navigated = await goToNextPage(page);
-        console.error(`[fetch-orders] Navigated to next: ${navigated}`);
-        if (!navigated) break;
-        pageNum++;
-      } else {
-        hasMore = false;
+      let pageNum = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        console.error(
+          `[fetch-orders] Extracting ${requestedYear} page ${pageNum}...`,
+        );
+        onProgress?.(
+          `Extracting ${requestedYear} orders from page ${pageNum}...`,
+          result.orders.length,
+          0,
+        );
+
+        const pageHeaders = await extractOrderHeaders(page, region);
+        console.error(
+          `[fetch-orders] Found ${pageHeaders.length} orders on ${requestedYear} page ${pageNum}`,
+        );
+
+        const acceptedHeaders = pageHeaders.filter((header) => {
+          if (!isDateBounded) return true;
+
+          if (!header.date || Number.isNaN(header.date.getTime())) {
+            excludedInvalidDateCount++;
+            return false;
+          }
+
+          const headerDateValue = dateValue(header.date);
+          if (parsedStartDate && headerDateValue < parsedStartDate.value) {
+            return false;
+          }
+          if (parsedEndDate && headerDateValue > parsedEndDate.value) {
+            return false;
+          }
+          return true;
+        });
+
+        const remaining = maxOrders
+          ? Math.max(maxOrders - result.orders.length, 0)
+          : acceptedHeaders.length;
+        result.orders.push(
+          ...(acceptedHeaders.slice(0, remaining) as EnrichedOrder[]),
+        );
+        onProgress?.(
+          `Found ${result.orders.length} matching orders (${requestedYear} page ${pageNum})...`,
+          result.orders.length,
+          0,
+        );
+
+        if (maxOrders && result.orders.length >= maxOrders) {
+          reachedLimit = true;
+          break;
+        }
+
+        hasMore = await hasNextPage(page);
+        console.error(`[fetch-orders] Has next page: ${hasMore}`);
+        if (hasMore) {
+          const navigated = await goToNextPage(page);
+          console.error(`[fetch-orders] Navigated to next: ${navigated}`);
+          if (!navigated) break;
+          pageNum++;
+        }
       }
+
+      if (reachedLimit) break;
     }
 
+    appendInvalidDateSummary();
     result.totalFound = result.orders.length;
     const extractionMode = useInvoice ? "invoice" : "detail";
     onProgress?.(
