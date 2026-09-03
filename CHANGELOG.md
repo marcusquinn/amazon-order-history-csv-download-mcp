@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-03
+
+### Added
+
+- Support for Amazon's current APX transactions page, including paginated traversal with the legacy infinite-scroll strategy retained as a fallback (#6, #8)
+- `AMAZON_ORDERS_BROWSER_DATA_DIR` configuration for isolated persistent profiles across concurrent Amazon accounts (#2)
+
+### Fixed
+
+- APX transaction extraction now handles browser `NodeList` values and waits for changed rows after the Next action before continuing
+- Leading-plus refunds such as `+$93.59` retain their positive amount and regional currency
+- Browser sessions recover after the persistent context or page is closed unexpectedly
+- Amazon error-banner rows are excluded from transaction exports
+
+### Changed
+
+- Transaction tool descriptions now cover both page and scroll advances
+- Expanded related-project documentation and excluded browser-only source from Sonar coverage calculations
+
 ## [0.3.1] - 2024-12-01
 
 ### Added
@@ -95,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-region date and currency parsing utilities
 - XPath extraction strategies for Amazon DOM
 
-[Unreleased]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.1.0...v0.2.0
