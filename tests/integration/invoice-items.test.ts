@@ -79,6 +79,7 @@ describeWithBrowser("modern invoice item extraction", () => {
     expect(notebook?.unitPrice.amount).toBe(4.5);
     expect(notebook?.seller?.name).toBe("Shared Seller");
     expect(mouse?.unitPrice.amount).toBe(14.99);
+    expect(mouse?.seller?.name).toBe("Row Seller");
     expect(mouse?.subscriptionFrequency).toBe("Every 2 months");
   });
 
@@ -110,5 +111,8 @@ describeWithBrowser("modern invoice item extraction", () => {
       { name: "Desk Lamp", quantity: 1 },
       { name: "Legacy Adapter", quantity: 3 },
     ]);
+    expect(
+      result.items.find((item) => item.name === "Wireless Mouse")?.seller?.name,
+    ).toBe("Row Seller");
   });
 });

@@ -37,6 +37,30 @@ async function optionalText(locator: Locator): Promise<string> {
   return await element.textContent({ timeout: 300 }).catch(() => '') || '';
 }
 
+async function extractSellerFromMerchant(merchant: Locator): Promise<SellerInfo | undefined> {
+  const linkedSeller = await optionalText(merchant.locator('a'));
+  if (linkedSeller.trim()) {
+    return { name: linkedSeller.trim(), soldBy: linkedSeller.trim() };
+  }
+
+  return extractSellerFromText(await optionalText(merchant));
+}
+
+async function extractSellerFromScope(scope: Locator): Promise<SellerInfo | undefined> {
+  return extractSellerFromMerchant(scope.locator('[data-component="orderedMerchant"]').first());
+}
+
+async function extractContainerSeller(container: Locator): Promise<SellerInfo | undefined> {
+  const merchants = await container.locator('[data-component="orderedMerchant"]').all();
+  for (const merchant of merchants) {
+    const isInItemRow = await merchant.evaluate((element) =>
+      Boolean(element.closest('.a-fixed-left-grid')),
+    ).catch(() => true);
+    if (!isInItemRow) return extractSellerFromMerchant(merchant);
+  }
+  return undefined;
+}
+
 /**
  * Extract seller information from item container text.
  * Looks for patterns like:
@@ -171,18 +195,7 @@ export async function extractDataComponentItems(
 
   for (const container of containers) {
     try {
-      let seller: SellerInfo | undefined;
-      const sellerText = await optionalText(container.locator('[data-component="orderedMerchant"] a'));
-      if (sellerText?.trim()) {
-        seller = { name: sellerText.trim(), soldBy: sellerText.trim() };
-      } else {
-        const merchantText = await optionalText(container.locator('[data-component="orderedMerchant"]'));
-        seller = extractSellerFromText(merchantText || '');
-      }
-      if (!seller) {
-        const containerText = await container.textContent({ timeout: 300 }).catch(() => '');
-        seller = extractSellerFromText(containerText || '');
-      }
+      const containerSeller = await extractContainerSeller(container);
 
       const rows = await container.locator('.a-fixed-left-grid').all();
       const titleCount = await container.locator('[data-component="itemTitle"] a').count().catch(() => 0);
@@ -222,6 +235,7 @@ export async function extractDataComponentItems(
         const frequencyText = await optionalText(scope.locator('[data-component="deliveryFrequency"]'));
         const frequencyMatch = frequencyText?.match(/Auto-delivered:\s*(.+)/i);
         const subscriptionFrequency = frequencyMatch?.[1].trim();
+        const seller = await extractSellerFromScope(scope) || containerSeller;
 
         debug(`Data components: Found item ${asin} - ${name.slice(0, 40)} - ${price.formatted} x${quantity}`);
         items.push({
