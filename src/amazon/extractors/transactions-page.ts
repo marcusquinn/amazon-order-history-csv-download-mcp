@@ -17,18 +17,17 @@ import { getRegionByCode } from "../regions";
 interface BrowserElement {
   textContent: string | null;
   classList: { contains: (className: string) => boolean };
-  querySelectorAll: (selector: string) => BrowserElement[];
+  querySelectorAll: (selector: string) => ArrayLike<BrowserElement>;
   getAttribute: (name: string) => string | null;
   closest: (selector: string) => BrowserElement | null;
 }
 
 interface BrowserDocument {
-  querySelectorAll: (selector: string) => BrowserElement[];
+  querySelectorAll: (selector: string) => ArrayLike<BrowserElement>;
 }
 
 interface BrowserWindow {
   document: BrowserDocument;
-  location: { href: string };
 }
 
 interface RawApxTransaction {
@@ -67,7 +66,7 @@ export function getTransactionsPageUrl(region: string): string {
 
 /**
  * Extract all transactions from the transactions page.
- * Uses scrolling to load all transactions (Amazon lazy-loads them).
+ * Uses page navigation for APX layouts and scrolling for legacy layouts.
  */
 export async function extractTransactionsFromPage(
   page: Page,
@@ -235,17 +234,15 @@ async function extractStrategyApx(
   const rawTransactions: RawApxTransaction[] = await page.evaluate(() => {
     const STATUS_RE = /^(Pending|Completed|In progress|Charged|Refunded)$/i;
     const getOrderIds = (item: BrowserElement): string[] => {
-      const orderIds = item
-        .querySelectorAll('a[href*="orderID="]')
+      const orderIds = item.querySelectorAll('a[href*="orderID="]');
+      const matchedOrderIds = Array.from(orderIds)
         .map((anchor) => anchor.getAttribute("href") || "")
         .map((href) => href.match(/orderID=([A-Z0-9-]+)/i)?.[1])
         .filter((orderId): orderId is string => Boolean(orderId));
 
-      if (orderIds.length > 0) return orderIds;
+      if (matchedOrderIds.length > 0) return matchedOrderIds;
 
-      return (
-        item.textContent?.match(/[A-Z]?\d{2,3}-\d{7}-\d{7}/g) || []
-      );
+      return item.textContent?.match(/[A-Z]?\d{2,3}-\d{7}-\d{7}/g) || [];
     };
 
     const getTransactionFields = (
@@ -256,7 +253,7 @@ async function extractStrategyApx(
       let vendor = "";
       let status = "";
 
-      for (const span of item.querySelectorAll("span")) {
+      for (const span of Array.from(item.querySelectorAll("span"))) {
         const text = span.textContent?.trim() || "";
         if (!text) continue;
 
@@ -278,8 +275,10 @@ async function extractStrategyApx(
     };
 
     const browserWindow = globalThis as unknown as BrowserWindow;
-    const nodes = browserWindow.document.querySelectorAll(
-      ".apx-transaction-date-container, .apx-transactions-line-item-component-container",
+    const nodes = Array.from(
+      browserWindow.document.querySelectorAll(
+        ".apx-transaction-date-container, .apx-transactions-line-item-component-container",
+      ),
     );
     const results: RawApxTransaction[] = [];
     let currentDate = "";
@@ -692,25 +691,24 @@ async function goToNextPage(page: Page): Promise<boolean> {
 
   const count = await nextButton.count().catch(() => 0);
   if (count > 0) {
-    const previousPage = {
-      url: page.url(),
-      rows: await page.locator(APX_TRANSACTION_SELECTOR).allTextContents(),
-    };
+    const previousRows = (
+      await page.locator(APX_TRANSACTION_SELECTOR).allTextContents()
+    ).map((row) => row.trim());
 
     try {
       await nextButton.first().click({ noWaitAfter: true });
       await page.waitForFunction(
-        (previous) => {
+        (previous: { rows: string[]; selector: string }) => {
           const browserWindow = globalThis as unknown as BrowserWindow;
-          const currentRows = browserWindow.document
-            .querySelectorAll(APX_TRANSACTION_SELECTOR)
-            .map((row) => row.textContent?.trim() || "");
+          const currentRows = Array.from(
+            browserWindow.document.querySelectorAll(previous.selector),
+          ).map((row) => row.textContent?.trim() || "");
           return (
-            browserWindow.location.href !== previous.url ||
+            currentRows.length > 0 &&
             currentRows.join("\n") !== previous.rows.join("\n")
           );
         },
-        previousPage,
+        { rows: previousRows, selector: APX_TRANSACTION_SELECTOR },
         { timeout: APX_PAGE_TRANSITION_TIMEOUT_MS },
       );
       return true;
