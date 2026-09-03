@@ -8,7 +8,7 @@ import { Locator, Page } from 'playwright';
 import { appendFileSync } from 'fs';
 import { Item, extractAsinFromUrl } from '../../core/types/item';
 import { OrderHeader } from '../../core/types/order';
-import { parseMoney } from '../../core/types/money';
+import { Money, parseMoney } from '../../core/types/money';
 import { getRegionByCode } from '../regions';
 
 function debug(msg: string): void {
@@ -172,6 +172,97 @@ function extractConditionFromText(text: string): string | undefined {
   return undefined;
 }
 
+async function extractPriceFromScope(scope: Locator, currency: string): Promise<Money> {
+  const priceText = await optionalText(scope.locator('[data-component="unitPrice"] .a-offscreen'));
+  if (priceText) return parseMoney(priceText, currency);
+
+  const fallbackText = await optionalText(scope.locator('[data-component="unitPrice"] span:not(:has(span))'));
+  return parseMoney(fallbackText, currency);
+}
+
+async function extractQuantityFromScope(scope: Locator): Promise<number> {
+  const badgeText = await optionalText(scope.locator('[data-component="itemImage"] .od-item-view-qty span, .od-item-view-qty span'));
+  const quantityText = badgeText || await optionalText(scope.locator('[data-component="quantity"]'));
+  const match = quantityText.match(/(\d+)/);
+  return match ? parseInt(match[1], 10) : 1;
+}
+
+async function extractConditionFromScope(scope: Locator): Promise<string | undefined> {
+  const conditionText = await optionalText(scope.locator('[data-component="itemCondition"]'));
+  const match = conditionText.match(/Condition:\s*(.+)/i);
+  return match?.[1].trim() || extractConditionFromText(await optionalText(scope));
+}
+
+async function extractFrequencyFromScope(scope: Locator): Promise<string | undefined> {
+  const frequencyText = await optionalText(scope.locator('[data-component="deliveryFrequency"]'));
+  return frequencyText.match(/Auto-delivered:\s*(.+)/i)?.[1].trim();
+}
+
+function buildProductUrl(href: string, region: string): string {
+  if (!href || href.startsWith('http')) return href;
+  const domain = getRegionByCode(region)?.domain;
+  return domain ? `https://www.${domain}${href}` : '';
+}
+
+async function extractItemFromScope(
+  scope: Locator,
+  header: OrderHeader,
+  currency: string,
+  containerSeller: SellerInfo | undefined,
+): Promise<Item | null> {
+  const titleLink = scope.locator('[data-component="itemTitle"] a').first();
+  const name = await optionalText(titleLink);
+  if (!name.trim()) return null;
+
+  const href = await titleLink.getAttribute('href', { timeout: 300 }).catch(() => '') || '';
+  const asin = href ? extractAsinFromUrl(href) : undefined;
+  const unitPrice = await extractPriceFromScope(scope, currency);
+  const quantity = await extractQuantityFromScope(scope);
+  const seller = await extractSellerFromScope(scope) || containerSeller;
+
+  debug(`Data components: Found item ${asin} - ${name.slice(0, 40)} - ${unitPrice.formatted} x${quantity}`);
+  return {
+    id: asin || name.trim().slice(0, 50),
+    asin,
+    name: name.trim(),
+    quantity,
+    unitPrice,
+    totalPrice: { ...unitPrice, amount: unitPrice.amount * quantity },
+    url: buildProductUrl(href, header.region),
+    orderHeader: header,
+    seller,
+    condition: await extractConditionFromScope(scope),
+    subscriptionFrequency: await extractFrequencyFromScope(scope),
+    platformData: {},
+  };
+}
+
+async function extractItemsFromContainer(
+  container: Locator,
+  header: OrderHeader,
+  currency: string,
+): Promise<Item[]> {
+  const rows = await container.locator('.a-fixed-left-grid').all();
+  const titleCount = await container.locator('[data-component="itemTitle"] a').count().catch(() => 0);
+  const itemScopes = rows.length > 0 ? rows : titleCount === 1 ? [container] : [];
+  if (itemScopes.length === 0) {
+    debug(`Data components: Skipping ambiguous container with ${titleCount} titles and no item rows`);
+    return [];
+  }
+
+  const containerSeller = await extractContainerSeller(container);
+  const items: Item[] = [];
+  for (const scope of itemScopes) {
+    try {
+      const item = await extractItemFromScope(scope, header, currency, containerSeller);
+      if (item) items.push(item);
+    } catch (error) {
+      debug(`Data components: Error extracting item: ${error}`);
+    }
+  }
+  return items;
+}
+
 /**
  * Extract modern physical-order items from data-component markup.
  * A purchasedItems container can contain several item rows, while Amazon only
@@ -187,77 +278,12 @@ export async function extractDataComponentItems(
   const containers = purchasedItemContainers.length > 0
     ? purchasedItemContainers
     : await page.locator('xpath=//div[div[@data-component="itemTitle"]]').all();
-
   debug(`Data components: Found ${containers.length} item containers`);
-  if (containers.length === 0) return null;
 
   const items: Item[] = [];
-
   for (const container of containers) {
-    try {
-      const containerSeller = await extractContainerSeller(container);
-
-      const rows = await container.locator('.a-fixed-left-grid').all();
-      const titleCount = await container.locator('[data-component="itemTitle"] a').count().catch(() => 0);
-      const itemScopes = rows.length > 0 ? rows : titleCount === 1 ? [container] : [];
-
-      if (itemScopes.length === 0) {
-        debug(`Data components: Skipping ambiguous container with ${titleCount} titles and no item rows`);
-        continue;
-      }
-
-      for (const scope of itemScopes) {
-        const titleLink = scope.locator('[data-component="itemTitle"] a').first();
-        const name = await titleLink.textContent({ timeout: 300 }).catch(() => '');
-        if (!name?.trim()) continue;
-
-        const href = await titleLink.getAttribute('href', { timeout: 300 }).catch(() => '');
-        const asin = href ? extractAsinFromUrl(href) : undefined;
-
-        let price = parseMoney('', currency);
-        const priceText = await optionalText(scope.locator('[data-component="unitPrice"] .a-offscreen'));
-        if (priceText) {
-          price = parseMoney(priceText, currency);
-        } else {
-          const fallbackPriceText = await optionalText(scope.locator('[data-component="unitPrice"] span:not(:has(span))'));
-          price = parseMoney(fallbackPriceText || '', currency);
-        }
-
-        const qtyText = await optionalText(scope.locator('[data-component="itemImage"] .od-item-view-qty span, .od-item-view-qty span'));
-        const quantityText = qtyText || await optionalText(scope.locator('[data-component="quantity"]'));
-        const quantityMatch = quantityText?.match(/(\d+)/);
-        const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 1;
-
-        const conditionText = await optionalText(scope.locator('[data-component="itemCondition"]'));
-        const conditionMatch = conditionText?.match(/Condition:\s*(.+)/i);
-        const condition = conditionMatch?.[1].trim() || extractConditionFromText(await optionalText(scope));
-
-        const frequencyText = await optionalText(scope.locator('[data-component="deliveryFrequency"]'));
-        const frequencyMatch = frequencyText?.match(/Auto-delivered:\s*(.+)/i);
-        const subscriptionFrequency = frequencyMatch?.[1].trim();
-        const seller = await extractSellerFromScope(scope) || containerSeller;
-
-        debug(`Data components: Found item ${asin} - ${name.slice(0, 40)} - ${price.formatted} x${quantity}`);
-        items.push({
-          id: asin || name.trim().slice(0, 50),
-          asin,
-          name: name.trim(),
-          quantity,
-          unitPrice: price,
-          totalPrice: { ...price, amount: price.amount * quantity },
-          url: href ? (href.startsWith('http') ? href : `https://www.${getRegionByCode(header.region)?.domain}${href}`) : '',
-          orderHeader: header,
-          seller,
-          condition,
-          subscriptionFrequency,
-          platformData: {},
-        });
-      }
-    } catch (error) {
-      debug(`Data components: Error extracting container: ${error}`);
-    }
+    items.push(...await extractItemsFromContainer(container, header, currency));
   }
-
   return items.length > 0 ? items : null;
 }
 

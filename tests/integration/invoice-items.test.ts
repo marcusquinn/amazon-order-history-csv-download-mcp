@@ -1,17 +1,20 @@
-import { existsSync, readFileSync } from "fs";
-import { join } from "path";
-import { Browser, chromium, Page } from "playwright";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { chromium } from "playwright";
+import type { Browser, Page } from "playwright";
 import { AmazonPlugin } from "../../src/amazon/adapter";
 import { extractDataComponentItems } from "../../src/amazon/extractors/items";
-import { OrderHeader } from "../../src/core/types/order";
+import type { OrderHeader } from "../../src/core/types/order";
 import { fetchOrders } from "../../src/tools/fetch-orders";
 
-const browserExecutable = [
-  chromium.executablePath(),
-  process.platform === "darwin"
-    ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    : "",
-].find((candidate) => candidate && existsSync(candidate));
+const bundledBrowser = chromium.executablePath();
+const macOsBrowser =
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const browserExecutable = existsSync(bundledBrowser)
+  ? bundledBrowser
+  : process.platform === "darwin" && existsSync(macOsBrowser)
+    ? macOsBrowser
+    : undefined;
 
 const describeWithBrowser = browserExecutable ? describe : describe.skip;
 
