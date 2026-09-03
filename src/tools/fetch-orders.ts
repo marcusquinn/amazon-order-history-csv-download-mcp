@@ -107,29 +107,15 @@ function parseIsoDateBound(value: string): ParsedDateBound | null {
   const parsedYear = Number(match[1]);
   const parsedMonth = Number(match[2]);
   const parsedDay = Number(match[3]);
-  const isLeapYear =
-    parsedYear % 4 === 0 && (parsedYear % 100 !== 0 || parsedYear % 400 === 0);
-  const daysByMonth = [
-    31,
-    isLeapYear ? 29 : 28,
-    31,
-    30,
-    31,
-    30,
-    31,
-    31,
-    30,
-    31,
-    30,
-    31,
-  ];
+  const parsedDate = new Date(0);
+  parsedDate.setUTCHours(0, 0, 0, 0);
+  parsedDate.setUTCFullYear(parsedYear, parsedMonth - 1, parsedDay);
 
   if (
     parsedYear < 1 ||
-    parsedMonth < 1 ||
-    parsedMonth > 12 ||
-    parsedDay < 1 ||
-    parsedDay > daysByMonth[parsedMonth - 1]
+    parsedDate.getUTCFullYear() !== parsedYear ||
+    parsedDate.getUTCMonth() !== parsedMonth - 1 ||
+    parsedDate.getUTCDate() !== parsedDay
   ) {
     return null;
   }
@@ -143,6 +129,18 @@ function parseIsoDateBound(value: string): ParsedDateBound | null {
 function dateValue(date: Date): number {
   return (
     date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()
+  );
+}
+
+function appendInvalidDateSummary(
+  result: FetchOrdersResult,
+  excludedInvalidDateCount: number,
+): void {
+  if (excludedInvalidDateCount === 0) return;
+
+  const orderNoun = excludedInvalidDateCount === 1 ? "order" : "orders";
+  result.errors.push(
+    `Excluded ${excludedInvalidDateCount} ${orderNoun} with missing or invalid dates from the bounded result.`,
   );
 }
 
@@ -644,13 +642,6 @@ export async function fetchOrders(
 
     let excludedInvalidDateCount = 0;
     let reachedLimit = false;
-    const appendInvalidDateSummary = (): void => {
-      if (excludedInvalidDateCount > 0) {
-        result.errors.push(
-          `Excluded ${excludedInvalidDateCount} order${excludedInvalidDateCount === 1 ? "" : "s"} with missing or invalid dates from the bounded result.`,
-        );
-      }
-    };
 
     for (const requestedYear of years) {
       const listUrl = plugin.getOrderListUrl(region, { year: requestedYear });
@@ -678,7 +669,7 @@ export async function fetchOrders(
         `[fetch-orders] Auth result: ${JSON.stringify(authStatus)}`,
       );
       if (!authStatus.authenticated) {
-        appendInvalidDateSummary();
+        appendInvalidDateSummary(result, excludedInvalidDateCount);
         result.totalFound = result.orders.length;
         result.errors.push(`Not authenticated: ${authStatus.message}`);
         return result;
@@ -750,7 +741,7 @@ export async function fetchOrders(
       if (reachedLimit) break;
     }
 
-    appendInvalidDateSummary();
+    appendInvalidDateSummary(result, excludedInvalidDateCount);
     result.totalFound = result.orders.length;
     const extractionMode = useInvoice ? "invoice" : "detail";
     onProgress?.(

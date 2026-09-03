@@ -1,13 +1,13 @@
-import { Page } from "playwright";
-import { AmazonPlugin } from "../../../src/amazon/adapter";
+import type { Page } from "playwright";
+import type { AmazonPlugin } from "../../../src/amazon/adapter";
 import {
   extractOrderDetails,
   extractOrderHeaders,
   goToNextPage,
   hasNextPage,
 } from "../../../src/amazon/extractors";
-import { OrderHeader } from "../../../src/core/types/order";
-import { OrderListParams } from "../../../src/core/types/platform";
+import type { OrderHeader } from "../../../src/core/types/order";
+import type { OrderListParams } from "../../../src/core/types/platform";
 import { fetchOrders } from "../../../src/tools/fetch-orders";
 
 jest.mock("../../../src/amazon/extractors", () => ({
