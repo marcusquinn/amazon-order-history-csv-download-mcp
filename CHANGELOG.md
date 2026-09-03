@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Order exports now honor bounded date ranges that span calendar years (#11)
+- Order exports now honor bounded date ranges that span calendar years and retain already-found orders if authentication expires during traversal (#11)
 - Modern invoice, detail, and single-order extraction now binds sparse quantities and seller metadata to each item row (#14)
 - Code-quality workflows now use supported action versions (#10)
 
