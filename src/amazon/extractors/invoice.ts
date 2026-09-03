@@ -12,6 +12,7 @@ import { Item, extractAsinFromUrl } from "../../core/types/item";
 import { OrderHeader, Payment } from "../../core/types/order";
 import { Money, parseMoney } from "../../core/types/money";
 import { getRegionByCode } from "../regions";
+import { extractDataComponentItems } from "./items";
 
 /**
  * Invoice data extracted from Amazon invoice page.
@@ -543,11 +544,24 @@ async function extractPayments(page: Page): Promise<Payment[]> {
  */
 async function extractItems(
   page: Page,
-  _header: OrderHeader,
+  header: OrderHeader,
   currency: string,
 ): Promise<InvoiceItem[]> {
   // Strategy 0: Use data-component selectors (fastest, most reliable)
-  let items = await extractItemsFromDataComponents(page, currency);
+  const dataComponentItems = await extractDataComponentItems(
+    page,
+    header,
+    currency,
+  );
+  let items: InvoiceItem[] = (dataComponentItems || []).map((item) => ({
+    name: item.name,
+    asin: item.asin,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    condition: item.condition,
+    seller: item.seller?.name,
+    subscriptionFrequency: item.subscriptionFrequency,
+  }));
   console.error(`[invoice] Strategy 0 (data-component): ${items.length} items`);
   if (items.length > 0) return items;
 
@@ -569,180 +583,6 @@ async function extractItems(
   // Strategy 4: Parse from page text (fallback)
   items = await extractItemsFromText(page, currency);
   console.error(`[invoice] Strategy 4 (text): ${items.length} items`);
-
-  return items;
-}
-
-/**
- * Strategy 0: Extract items using data-component selectors.
- * This is the most reliable method as Amazon uses consistent data-component attributes.
- *
- * Structure:
- * - [data-component="purchasedItems"] - container for each item
- *   - [data-component="itemTitle"] a - product name + ASIN from href
- *   - [data-component="unitPrice"] .a-offscreen - price
- *   - [data-component="itemCondition"] - condition text
- *   - [data-component="orderedMerchant"] a - seller name
- *   - [data-component="quantity"] - quantity (empty = 1)
- *   - [data-component="itemImage"] .od-item-view-qty span - quantity badge (alternative location)
- */
-async function extractItemsFromDataComponents(
-  page: Page,
-  currency: string,
-): Promise<InvoiceItem[]> {
-  const items: InvoiceItem[] = [];
-
-  // Find all purchasedItems containers
-  const itemContainers = await page
-    .locator('[data-component="purchasedItems"]')
-    .all();
-
-  console.error(
-    `[invoice] extractItemsFromDataComponents: Found ${itemContainers.length} purchasedItems containers`,
-  );
-
-  for (const container of itemContainers) {
-    try {
-      // Get ALL item titles from this container (may have multiple for variants)
-      const titleLinks = await container
-        .locator('[data-component="itemTitle"] a')
-        .all();
-
-      console.error(
-        `[invoice] Container has ${titleLinks.length} itemTitle links`,
-      );
-
-      if (titleLinks.length === 0) continue;
-
-      // Get shared data from container (seller, etc.) - same for all items in container
-      let sharedSeller: string | undefined;
-      const sellerLink = container
-        .locator('[data-component="orderedMerchant"] a')
-        .first();
-      const sellerLinkCount = await sellerLink.count().catch(() => 0);
-      if (sellerLinkCount > 0) {
-        const sellerText = await sellerLink
-          .textContent({ timeout: 300 })
-          .catch(() => "");
-        sharedSeller = sellerText?.trim() || undefined;
-      } else {
-        const sellerSpan = container
-          .locator('[data-component="orderedMerchant"] span')
-          .first();
-        const sellerSpanCount = await sellerSpan.count().catch(() => 0);
-        if (sellerSpanCount > 0) {
-          const sellerText = await sellerSpan
-            .textContent({ timeout: 300 })
-            .catch(() => "");
-          const sellerMatch = sellerText?.match(/Sold by:\s*(.+)/i);
-          if (sellerMatch) {
-            sharedSeller = sellerMatch[1].trim();
-          }
-        }
-      }
-
-      // Process each item title in the container
-      for (let i = 0; i < titleLinks.length; i++) {
-        const titleLink = titleLinks[i];
-
-        const name = await titleLink
-          .textContent({ timeout: 300 })
-          .catch(() => "");
-        if (!name || !name.trim()) continue;
-
-        const href = await titleLink
-          .getAttribute("href", { timeout: 300 })
-          .catch(() => "");
-        const asin = href ? extractAsinFromUrl(href) : undefined;
-
-        console.error(
-          `[invoice] Item ${i + 1}/${titleLinks.length} found: ASIN=${asin}, name=${name.slice(0, 50)}...`,
-        );
-
-        // Get price - try to get the i-th price element (prices are in same order as titles)
-        let price = parseMoney("0", currency);
-        const priceElements = await container
-          .locator('[data-component="unitPrice"] .a-offscreen')
-          .all();
-        if (priceElements.length > i) {
-          const priceText = await priceElements[i]
-            .textContent({ timeout: 300 })
-            .catch(() => "");
-          if (priceText) {
-            price = parseMoney(priceText, currency);
-          }
-        } else if (priceElements.length > 0) {
-          // Fallback to first price if not enough prices
-          const priceText = await priceElements[0]
-            .textContent({ timeout: 300 })
-            .catch(() => "");
-          if (priceText) {
-            price = parseMoney(priceText, currency);
-          }
-        }
-
-        // Get condition - try i-th element
-        let condition: string | undefined;
-        const conditionElements = await container
-          .locator('[data-component="itemCondition"]')
-          .all();
-        if (conditionElements.length > i) {
-          const conditionText = await conditionElements[i]
-            .textContent({ timeout: 300 })
-            .catch(() => "");
-          const conditionMatch = conditionText?.match(/Condition:\s*(.+)/i);
-          if (conditionMatch) {
-            condition = conditionMatch[1].trim();
-          }
-        }
-
-        // Get quantity - try i-th element
-        let quantity = 1;
-        const qtyElements = await container
-          .locator(
-            '[data-component="itemImage"] .od-item-view-qty span, .od-item-view-qty span',
-          )
-          .all();
-        if (qtyElements.length > i) {
-          const qtyText = await qtyElements[i]
-            .textContent({ timeout: 300 })
-            .catch(() => "");
-          const qtyMatch = qtyText?.match(/(\d+)/);
-          if (qtyMatch) {
-            quantity = parseInt(qtyMatch[1], 10);
-          }
-        }
-
-        // Get subscription frequency - try i-th element
-        let subscriptionFrequency: string | undefined;
-        const freqElements = await container
-          .locator('[data-component="deliveryFrequency"]')
-          .all();
-        if (freqElements.length > i) {
-          const freqText = await freqElements[i]
-            .textContent({ timeout: 300 })
-            .catch(() => "");
-          const freqMatch = freqText?.match(/Auto-delivered:\s*(.+)/i);
-          if (freqMatch) {
-            subscriptionFrequency = freqMatch[1].trim();
-          }
-        }
-
-        items.push({
-          name: name.trim(),
-          asin,
-          quantity,
-          unitPrice: price,
-          condition,
-          seller: sharedSeller,
-          subscriptionFrequency,
-        });
-      }
-    } catch (e) {
-      console.error(`[invoice] Error extracting from container: ${e}`);
-      continue;
-    }
-  }
 
   return items;
 }

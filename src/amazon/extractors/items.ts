@@ -4,7 +4,7 @@
  * @see https://github.com/philipmulcahy/azad
  */
 
-import { Page } from 'playwright';
+import { Locator, Page } from 'playwright';
 import { appendFileSync } from 'fs';
 import { Item, extractAsinFromUrl } from '../../core/types/item';
 import { OrderHeader } from '../../core/types/order';
@@ -29,6 +29,12 @@ export interface SellerInfo {
   id?: string;           // Seller ID if available
   soldBy?: string;       // "Sold by" value
   suppliedBy?: string;   // "Supplied by" / "Fulfilled by" value
+}
+
+async function optionalText(locator: Locator): Promise<string> {
+  const element = locator.first();
+  if (await element.count().catch(() => 0) === 0) return '';
+  return await element.textContent({ timeout: 300 }).catch(() => '') || '';
 }
 
 /**
@@ -143,176 +149,98 @@ function extractConditionFromText(text: string): string | undefined {
 }
 
 /**
- * Strategy 4 (AZAD): 2024+ physical orders using data-component attributes
- * This is the primary strategy - matches the working invoice extraction logic.
- * 
- * Structure:
- * - [data-component="purchasedItems"] - container for each item
- *   - [data-component="itemTitle"] a - product name + ASIN from href
- *   - [data-component="unitPrice"] .a-offscreen - price (clean text)
- *   - [data-component="itemCondition"] - condition text
- *   - [data-component="orderedMerchant"] a or span - seller name
- *   - [data-component="quantity"] - quantity (often empty)
- *   - [data-component="itemImage"] .od-item-view-qty span - quantity badge (primary location)
- *   - [data-component="deliveryFrequency"] - Subscribe & Save frequency
+ * Extract modern physical-order items from data-component markup.
+ * A purchasedItems container can contain several item rows, while Amazon only
+ * renders quantity badges for quantities above one. Fields must therefore be
+ * scoped to each row instead of paired by position across the container.
  */
-async function extractItemsStrategy4(page: Page, header: OrderHeader, currency: string): Promise<Item[] | null> {
-  // Find item containers using purchasedItems (same as working invoice logic)
-  const itemContainers = await page.locator('[data-component="purchasedItems"]').all();
-  debug(`Strategy4: Found ${itemContainers.length} purchasedItems containers`);
-  
-  if (itemContainers.length === 0) {
-    // Fallback: try parent div of itemTitle components
-    const fallbackContainers = await page.locator('xpath=//div[div[@data-component="itemTitle"]]').all();
-    debug(`Strategy4: Fallback found ${fallbackContainers.length} itemTitle parent containers`);
-    if (fallbackContainers.length === 0) return null;
-  }
+export async function extractDataComponentItems(
+  page: Page,
+  header: OrderHeader,
+  currency: string,
+): Promise<Item[] | null> {
+  const purchasedItemContainers = await page.locator('[data-component="purchasedItems"]').all();
+  const containers = purchasedItemContainers.length > 0
+    ? purchasedItemContainers
+    : await page.locator('xpath=//div[div[@data-component="itemTitle"]]').all();
+
+  debug(`Data components: Found ${containers.length} item containers`);
+  if (containers.length === 0) return null;
 
   const items: Item[] = [];
-  const containers = itemContainers.length > 0 
-    ? itemContainers 
-    : await page.locator('xpath=//div[div[@data-component="itemTitle"]]').all();
 
   for (const container of containers) {
     try {
-      // Get title from itemTitle component
-      const titleLink = container.locator('[data-component="itemTitle"] a').first();
-      const titleLinkCount = await titleLink.count().catch(() => 0);
-      
-      if (titleLinkCount === 0) {
-        debug(`Strategy4: Skipping item - no title link`);
-        continue;
-      }
-      
-      const name = await titleLink.textContent({ timeout: 300 }).catch(() => '');
-      if (!name?.trim()) {
-        debug(`Strategy4: Skipping item - no name`);
-        continue;
-      }
-      
-      const href = await titleLink.getAttribute('href', { timeout: 300 }).catch(() => '');
-      const asin = href ? extractAsinFromUrl(href) : undefined;
-
-      // Get price from unitPrice component (use .a-offscreen for clean text)
-      let price = parseMoney('', currency);
-      const priceEl = container.locator('[data-component="unitPrice"] .a-offscreen').first();
-      const priceCount = await priceEl.count().catch(() => 0);
-      if (priceCount > 0) {
-        const priceText = await priceEl.textContent({ timeout: 300 }).catch(() => '');
-        if (priceText) {
-          price = parseMoney(priceText, currency);
-        }
-      } else {
-        // Fallback: try any span in unitPrice
-        const priceElem = container.locator('[data-component="unitPrice"] span:not(:has(span))').first();
-        const priceText = await priceElem.textContent({ timeout: 300 }).catch(() => '');
-        price = parseMoney(priceText || '', currency);
-      }
-
-      // Get quantity - check multiple locations (matching invoice logic)
-      let quantity = 1;
-      
-      // Location 1: quantity badge on image (e.g., ".od-item-view-qty span")
-      const qtyBadge = container.locator('[data-component="itemImage"] .od-item-view-qty span, .od-item-view-qty span').first();
-      const qtyBadgeCount = await qtyBadge.count().catch(() => 0);
-      if (qtyBadgeCount > 0) {
-        const qtyText = await qtyBadge.textContent({ timeout: 300 }).catch(() => '');
-        const qtyMatch = qtyText?.match(/(\d+)/);
-        if (qtyMatch) {
-          quantity = parseInt(qtyMatch[1], 10);
-        }
-      }
-      
-      // Location 2: [data-component="quantity"] (fallback)
-      if (quantity === 1) {
-        const qtyEl = container.locator('[data-component="quantity"]').first();
-        const qtyCount = await qtyEl.count().catch(() => 0);
-        if (qtyCount > 0) {
-          const qtyText = await qtyEl.textContent({ timeout: 300 }).catch(() => '');
-          const qtyMatch = qtyText?.match(/(\d+)/);
-          if (qtyMatch) {
-            quantity = parseInt(qtyMatch[1], 10);
-          }
-        }
-      }
-
-      // Get condition from itemCondition component
-      let condition: string | undefined;
-      const conditionEl = container.locator('[data-component="itemCondition"]').first();
-      const conditionCount = await conditionEl.count().catch(() => 0);
-      if (conditionCount > 0) {
-        const conditionText = await conditionEl.textContent({ timeout: 300 }).catch(() => '');
-        const conditionMatch = conditionText?.match(/Condition:\s*(.+)/i);
-        if (conditionMatch) {
-          condition = conditionMatch[1].trim();
-        }
-      }
-
-      // Get seller - check both link and span (Amazon uses span without link)
       let seller: SellerInfo | undefined;
-      const sellerLink = container.locator('[data-component="orderedMerchant"] a').first();
-      const sellerLinkCount = await sellerLink.count().catch(() => 0);
-      if (sellerLinkCount > 0) {
-        const sellerText = await sellerLink.textContent({ timeout: 300 }).catch(() => '');
-        if (sellerText?.trim()) {
-          seller = { name: sellerText.trim(), soldBy: sellerText.trim() };
-        }
+      const sellerText = await optionalText(container.locator('[data-component="orderedMerchant"] a'));
+      if (sellerText?.trim()) {
+        seller = { name: sellerText.trim(), soldBy: sellerText.trim() };
       } else {
-        // Fallback: check for span with "Sold by:" text
-        const sellerSpan = container.locator('[data-component="orderedMerchant"] span').first();
-        const sellerSpanCount = await sellerSpan.count().catch(() => 0);
-        if (sellerSpanCount > 0) {
-          const sellerText = await sellerSpan.textContent({ timeout: 300 }).catch(() => '');
-          const sellerMatch = sellerText?.match(/Sold by:\s*(.+)/i);
-          if (sellerMatch) {
-            seller = { name: sellerMatch[1].trim(), soldBy: sellerMatch[1].trim() };
-          }
-        }
+        const merchantText = await optionalText(container.locator('[data-component="orderedMerchant"]'));
+        seller = extractSellerFromText(merchantText || '');
       }
-      
-      // Fallback: extract from container text
       if (!seller) {
         const containerText = await container.textContent({ timeout: 300 }).catch(() => '');
         seller = extractSellerFromText(containerText || '');
       }
-      
-      // Fallback for condition from container text
-      if (!condition) {
-        const containerText = await container.textContent({ timeout: 300 }).catch(() => '');
-        condition = extractConditionFromText(containerText || '');
+
+      const rows = await container.locator('.a-fixed-left-grid').all();
+      const titleCount = await container.locator('[data-component="itemTitle"] a').count().catch(() => 0);
+      const itemScopes = rows.length > 0 ? rows : titleCount === 1 ? [container] : [];
+
+      if (itemScopes.length === 0) {
+        debug(`Data components: Skipping ambiguous container with ${titleCount} titles and no item rows`);
+        continue;
       }
 
-      // Get Subscribe & Save delivery frequency
-      let subscriptionFrequency: string | undefined;
-      const freqEl = container.locator('[data-component="deliveryFrequency"]').first();
-      const freqCount = await freqEl.count().catch(() => 0);
-      if (freqCount > 0) {
-        const freqText = await freqEl.textContent({ timeout: 300 }).catch(() => '');
-        const freqMatch = freqText?.match(/Auto-delivered:\s*(.+)/i);
-        if (freqMatch) {
-          subscriptionFrequency = freqMatch[1].trim();
+      for (const scope of itemScopes) {
+        const titleLink = scope.locator('[data-component="itemTitle"] a').first();
+        const name = await titleLink.textContent({ timeout: 300 }).catch(() => '');
+        if (!name?.trim()) continue;
+
+        const href = await titleLink.getAttribute('href', { timeout: 300 }).catch(() => '');
+        const asin = href ? extractAsinFromUrl(href) : undefined;
+
+        let price = parseMoney('', currency);
+        const priceText = await optionalText(scope.locator('[data-component="unitPrice"] .a-offscreen'));
+        if (priceText) {
+          price = parseMoney(priceText, currency);
+        } else {
+          const fallbackPriceText = await optionalText(scope.locator('[data-component="unitPrice"] span:not(:has(span))'));
+          price = parseMoney(fallbackPriceText || '', currency);
         }
+
+        const qtyText = await optionalText(scope.locator('[data-component="itemImage"] .od-item-view-qty span, .od-item-view-qty span'));
+        const quantityText = qtyText || await optionalText(scope.locator('[data-component="quantity"]'));
+        const quantityMatch = quantityText?.match(/(\d+)/);
+        const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 1;
+
+        const conditionText = await optionalText(scope.locator('[data-component="itemCondition"]'));
+        const conditionMatch = conditionText?.match(/Condition:\s*(.+)/i);
+        const condition = conditionMatch?.[1].trim() || extractConditionFromText(await optionalText(scope));
+
+        const frequencyText = await optionalText(scope.locator('[data-component="deliveryFrequency"]'));
+        const frequencyMatch = frequencyText?.match(/Auto-delivered:\s*(.+)/i);
+        const subscriptionFrequency = frequencyMatch?.[1].trim();
+
+        debug(`Data components: Found item ${asin} - ${name.slice(0, 40)} - ${price.formatted} x${quantity}`);
+        items.push({
+          id: asin || name.trim().slice(0, 50),
+          asin,
+          name: name.trim(),
+          quantity,
+          unitPrice: price,
+          totalPrice: { ...price, amount: price.amount * quantity },
+          url: href ? (href.startsWith('http') ? href : `https://www.${getRegionByCode(header.region)?.domain}${href}`) : '',
+          orderHeader: header,
+          seller,
+          condition,
+          subscriptionFrequency,
+          platformData: {},
+        });
       }
-
-      debug(`Strategy4: Found item: ${asin} - ${name.slice(0, 40)} - ${price.formatted} x${quantity}${seller ? ` - Seller: ${seller.name}` : ''}${condition ? ` - Condition: ${condition}` : ''}${subscriptionFrequency ? ` - Sub: ${subscriptionFrequency}` : ''}`);
-
-      items.push({
-        id: asin || name.trim().slice(0, 50),
-        asin,
-        name: name.trim(),
-        quantity,
-        unitPrice: price,
-        totalPrice: { ...price, amount: price.amount * quantity },
-        url: href ? (href.startsWith('http') ? href : `https://www.${getRegionByCode(header.region)?.domain}${href}`) : '',
-        orderHeader: header,
-        seller,
-        condition,
-        subscriptionFrequency,
-        platformData: {},
-      });
-    } catch (e) {
-      debug(`Strategy4: Error extracting item: ${e}`);
-      continue;
+    } catch (error) {
+      debug(`Data components: Error extracting container: ${error}`);
     }
   }
 
@@ -632,7 +560,7 @@ export async function extractItems(
 
   // Try strategies in priority order (matching AZAD)
   const strategies = [
-    { name: 'Strategy4 (2024+ data-component)', fn: () => extractItemsStrategy4(page, header, currency) },
+    { name: 'Strategy4 (2024+ data-component)', fn: () => extractDataComponentItems(page, header, currency) },
     { name: 'Strategy0 (fixed-left-grid)', fn: () => extractItemsStrategy0(page, header, currency) },
     { name: 'Strategy3 (grocery/fresh)', fn: () => extractItemsStrategy3(page, header, currency) },
     { name: 'Strategy2 (2016 orderDetails)', fn: () => extractItemsStrategy2(page, header, currency) },
