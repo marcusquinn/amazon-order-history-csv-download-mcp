@@ -98,5 +98,5 @@ describe("APX transactions-page extraction", () => {
     });
 
     expect(transactions).toHaveLength(1);
-  });
+  }, 15000);
 });

@@ -701,14 +701,12 @@ async function goToNextPage(page: Page): Promise<boolean> {
     };
 
     try {
-      await nextButton.first().click({ noWaitAfter: true });
-      await page.waitForFunction(
+      const pageTransition = page.waitForFunction(
         (previous) => {
           const browserWindow = globalThis as unknown as BrowserWindow;
           const currentRows = Array.from(
             browserWindow.document.querySelectorAll(APX_TRANSACTION_SELECTOR),
-          )
-            .map((row) => row.textContent?.trim() || "");
+          ).map((row) => row.textContent?.trim() || "");
           return (
             browserWindow.location.href !== previous.url ||
             currentRows.join("\n") !== previous.rows.join("\n")
@@ -717,6 +715,8 @@ async function goToNextPage(page: Page): Promise<boolean> {
         previousPage,
         { timeout: APX_PAGE_TRANSITION_TIMEOUT_MS },
       );
+      await nextButton.first().click({ noWaitAfter: true });
+      await pageTransition;
       return true;
     } catch {
       return false;
