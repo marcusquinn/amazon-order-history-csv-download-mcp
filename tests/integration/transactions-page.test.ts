@@ -35,7 +35,9 @@ describe("APX transactions-page extraction", () => {
     try {
       browser = await chromium.launch({ headless: true });
     } catch {
-      console.log("Playwright browser not available, skipping integration tests");
+      console.log(
+        "Playwright browser not available, skipping integration tests",
+      );
     }
   });
 
@@ -55,7 +57,11 @@ describe("APX transactions-page extraction", () => {
     if (!browser) return;
 
     await page.route("**/cpe/yourpayments/transactions**", async (route) => {
-      const body = route.request().url().includes("page=2")
+      const requestUrl = new URL(route.request().url());
+      const isNextPage = requestUrl.searchParams.has(
+        "ppw-widgetEvent:DefaultNextPageNavigationEvent",
+      );
+      const body = isNextPage
         ? transactionPage("27 June 2026", "222-2222222-2222222", "-$47.99")
         : transactionPage(
             "28 June 2026",

@@ -691,28 +691,26 @@ async function goToNextPage(page: Page): Promise<boolean> {
 
   const count = await nextButton.count().catch(() => 0);
   if (count > 0) {
-    const previousPage = {
-      rows: await page.locator(APX_TRANSACTION_SELECTOR).allTextContents(),
-    };
+    const previousRows = (
+      await page.locator(APX_TRANSACTION_SELECTOR).allTextContents()
+    ).map((row) => row.trim());
 
     try {
-      await Promise.all([
-        page.waitForFunction(
-          (previous: { rows: string[]; selector: string }) => {
-            const browserWindow = globalThis as unknown as BrowserWindow;
-            const currentRows = Array.from(
-              browserWindow.document.querySelectorAll(previous.selector),
-            ).map((row) => row.textContent?.trim() || "");
-            return (
-              currentRows.length > 0 &&
-              currentRows.join("\n") !== previous.rows.join("\n")
-            );
-          },
-          { ...previousPage, selector: APX_TRANSACTION_SELECTOR },
-          { timeout: APX_PAGE_TRANSITION_TIMEOUT_MS },
-        ),
-        nextButton.first().click({ noWaitAfter: true }),
-      ]);
+      await nextButton.first().click({ noWaitAfter: true });
+      await page.waitForFunction(
+        (previous: { rows: string[]; selector: string }) => {
+          const browserWindow = globalThis as unknown as BrowserWindow;
+          const currentRows = Array.from(
+            browserWindow.document.querySelectorAll(previous.selector),
+          ).map((row) => row.textContent?.trim() || "");
+          return (
+            currentRows.length > 0 &&
+            currentRows.join("\n") !== previous.rows.join("\n")
+          );
+        },
+        { rows: previousRows, selector: APX_TRANSACTION_SELECTOR },
+        { timeout: APX_PAGE_TRANSITION_TIMEOUT_MS },
+      );
       return true;
     } catch {
       return false;
