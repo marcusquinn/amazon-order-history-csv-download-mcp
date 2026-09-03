@@ -14,6 +14,36 @@ import { parseMoney, getCurrencySymbol } from "../../core/types/money";
 import { parseDate } from "../../core/utils/date";
 import { getRegionByCode } from "../regions";
 
+interface BrowserElement {
+  textContent: string | null;
+  classList: { contains: (className: string) => boolean };
+  querySelectorAll: (selector: string) => BrowserElement[];
+  getAttribute: (name: string) => string | null;
+  closest: (selector: string) => BrowserElement | null;
+}
+
+interface BrowserDocument {
+  querySelectorAll: (selector: string) => BrowserElement[];
+}
+
+interface BrowserWindow {
+  document: BrowserDocument;
+  location: { href: string };
+}
+
+interface RawApxTransaction {
+  dateText: string;
+  amountText: string;
+  cardInfo: string;
+  orderIds: string[];
+  vendor: string;
+  status: string;
+}
+
+const APX_TRANSACTION_SELECTOR =
+  ".apx-transactions-line-item-component-container";
+const APX_PAGE_TRANSITION_TIMEOUT_MS = 10000;
+
 /**
  * Parse an amount from the transactions page, trusting the region's currency.
  * The page always displays amounts in the region's currency, but bare "$"
@@ -202,74 +232,38 @@ async function extractStrategyApx(
   page: Page,
   currency: string,
 ): Promise<Transaction[]> {
-  interface RawApxTransaction {
-    dateText: string;
-    amountText: string;
-    cardInfo: string;
-    orderIds: string[];
-    vendor: string;
-    status: string;
-  }
-
   const rawTransactions: RawApxTransaction[] = await page.evaluate(() => {
     const STATUS_RE = /^(Pending|Completed|In progress|Charged|Refunded)$/i;
-    const results: Array<{
-      dateText: string;
-      amountText: string;
-      cardInfo: string;
-      orderIds: string[];
-      vendor: string;
-      status: string;
-    }> = [];
+    const getOrderIds = (item: BrowserElement): string[] => {
+      const orderIds = item
+        .querySelectorAll('a[href*="orderID="]')
+        .map((anchor) => anchor.getAttribute("href") || "")
+        .map((href) => href.match(/orderID=([A-Z0-9-]+)/i)?.[1])
+        .filter((orderId): orderId is string => Boolean(orderId));
 
-    // tsconfig has no "dom" lib (this file otherwise runs in Node); the
-    // callback executes in the browser, so reach the DOM via untyped globals
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const doc = (globalThis as any).document;
-    const nodes: any[] = Array.from(
-      doc.querySelectorAll(
-        ".apx-transaction-date-container, .apx-transactions-line-item-component-container",
-      ),
-    );
-    let currentDate = "";
+      if (orderIds.length > 0) return orderIds;
 
-    for (const node of nodes) {
-      if (node.classList.contains("apx-transaction-date-container")) {
-        currentDate = (node.textContent || "").trim();
-        continue;
-      }
-
-      // Line item
-      const orderIds: string[] = [];
-      const anchors: any[] = Array.from(
-        node.querySelectorAll('a[href*="orderID="]'),
+      return (
+        item.textContent?.match(/[A-Z]?\d{2,3}-\d{7}-\d{7}/g) || []
       );
-      for (const a of anchors) {
-        const href = a.getAttribute("href") || "";
-        const m = href.match(/orderID=([A-Z0-9-]+)/i);
-        if (m) orderIds.push(m[1]);
-      }
-      // Fallback: order IDs in plain text
-      if (orderIds.length === 0) {
-        const text = node.textContent || "";
-        const matches = text.match(/[A-Z]?\d{2,3}-\d{7}-\d{7}/g);
-        if (matches) orderIds.push(...matches);
-      }
+    };
 
+    const getTransactionFields = (
+      item: BrowserElement,
+    ): Omit<RawApxTransaction, "dateText" | "orderIds"> => {
       let amountText = "";
       let cardInfo = "";
       let vendor = "";
       let status = "";
 
-      const spans: any[] = Array.from(node.querySelectorAll("span"));
-      for (const span of spans) {
-        const text = (span.textContent || "").trim();
+      for (const span of item.querySelectorAll("span")) {
+        const text = span.textContent?.trim() || "";
         if (!text) continue;
 
         const isBold = span.classList.contains("a-text-bold");
-        const inAmountColumn = !!span.closest(".a-text-right");
+        const isAmount = isBold && Boolean(span.closest(".a-text-right"));
 
-        if (inAmountColumn && isBold && !amountText) {
+        if (isAmount && !amountText) {
           amountText = text;
         } else if (isBold && !cardInfo) {
           cardInfo = text;
@@ -280,13 +274,26 @@ async function extractStrategyApx(
         }
       }
 
+      return { amountText, cardInfo, vendor, status };
+    };
+
+    const browserWindow = globalThis as unknown as BrowserWindow;
+    const nodes = browserWindow.document.querySelectorAll(
+      ".apx-transaction-date-container, .apx-transactions-line-item-component-container",
+    );
+    const results: RawApxTransaction[] = [];
+    let currentDate = "";
+
+    for (const node of nodes) {
+      if (node.classList.contains("apx-transaction-date-container")) {
+        currentDate = node.textContent?.trim() || "";
+        continue;
+      }
+
       results.push({
         dateText: currentDate,
-        amountText,
-        cardInfo,
-        orderIds,
-        vendor,
-        status,
+        orderIds: getOrderIds(node),
+        ...getTransactionFields(node),
       });
     }
 
@@ -685,20 +692,31 @@ async function goToNextPage(page: Page): Promise<boolean> {
 
   const count = await nextButton.count().catch(() => 0);
   if (count > 0) {
-    await Promise.all([
-      page
-        .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30000 })
-        .catch(() => {}),
-      nextButton.first().click(),
-    ]);
-    // Wait for the new page's transactions to render
-    await page
-      .waitForSelector(".apx-transactions-line-item-component-container", {
-        timeout: 10000,
-      })
-      .catch(() => {});
-    await page.waitForTimeout(500);
-    return true;
+    const previousPage = {
+      url: page.url(),
+      rows: await page.locator(APX_TRANSACTION_SELECTOR).allTextContents(),
+    };
+
+    try {
+      await nextButton.first().click({ noWaitAfter: true });
+      await page.waitForFunction(
+        (previous) => {
+          const browserWindow = globalThis as unknown as BrowserWindow;
+          const currentRows = browserWindow.document
+            .querySelectorAll(APX_TRANSACTION_SELECTOR)
+            .map((row) => row.textContent?.trim() || "");
+          return (
+            browserWindow.location.href !== previous.url ||
+            currentRows.join("\n") !== previous.rows.join("\n")
+          );
+        },
+        previousPage,
+        { timeout: APX_PAGE_TRANSITION_TIMEOUT_MS },
+      );
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // Legacy infinite-scroll layout: scroll the last item into view

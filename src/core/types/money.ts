@@ -43,8 +43,9 @@ export function parseMoney(formatted: string, defaultCurrency = "USD"): Money {
   // Handles formats like: -$12.34, ($12.34), -£15.85
   const startsWithNegative = cleaned.startsWith("-") || cleaned.startsWith("(");
 
-  // Remove leading negative sign or opening parenthesis for currency detection
-  const workingStr = cleaned.replace(/^[-(\s]+/, "");
+  // Remove a leading sign or opening parenthesis for currency detection.
+  // APX transaction rows use a leading plus sign for refunds (e.g. +$93.59).
+  const workingStr = cleaned.replace(/^[+\-(\s]+/, "");
 
   // Extract currency symbol/code
   let currency = defaultCurrency;
