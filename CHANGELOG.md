@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-04
+
+### Fixed
+
+- Order exports now honor bounded date ranges that span calendar years and retain already-found orders if authentication expires during traversal (#11)
+- Modern invoice, detail, and single-order extraction now binds sparse quantities and seller metadata to each item row (#14)
+- Code-quality workflows now use supported action versions (#10)
+
 ## [0.4.0] - 2026-09-03
 
 ### Added
@@ -114,7 +122,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-region date and currency parsing utilities
 - XPath extraction strategies for Amazon DOM
 
-[Unreleased]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.2.0...v0.3.0
