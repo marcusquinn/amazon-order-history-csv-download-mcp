@@ -44,12 +44,13 @@ const amazonPlugin = new AmazonPlugin();
 let browserContext: BrowserContext | null = null;
 let page: Page | null = null;
 
-// Browser data directory for session persistence
-const BROWSER_DATA_DIR = join(
-  homedir(),
-  ".amazon-order-history-mcp",
-  "browser-data",
-);
+// Browser data directory for session persistence.
+// Env var AMAZON_ORDERS_BROWSER_DATA_DIR overrides — required for multi-tenant
+// deployments (e.g. separate Personal vs Business Amazon accounts running as
+// two instances of this MCP, each with its own persistent Chromium profile).
+const BROWSER_DATA_DIR =
+  process.env.AMAZON_ORDERS_BROWSER_DATA_DIR ??
+  join(homedir(), ".amazon-order-history-mcp", "browser-data");
 
 /**
  * Get or create browser context instance.
