@@ -17,7 +17,7 @@ import { getRegionByCode } from "../regions";
 interface BrowserElement {
   textContent: string | null;
   classList: { contains: (className: string) => boolean };
-  querySelectorAll: (selector: string) => BrowserElement[];
+  querySelectorAll: (selector: string) => ArrayLike<BrowserElement>;
   getAttribute: (name: string) => string | null;
   closest: (selector: string) => BrowserElement | null;
 }
@@ -236,12 +236,13 @@ async function extractStrategyApx(
     const STATUS_RE = /^(Pending|Completed|In progress|Charged|Refunded)$/i;
     const getOrderIds = (item: BrowserElement): string[] => {
       const orderIds = item
-        .querySelectorAll('a[href*="orderID="]')
+        .querySelectorAll('a[href*="orderID="]');
+      const matchedOrderIds = Array.from(orderIds)
         .map((anchor) => anchor.getAttribute("href") || "")
         .map((href) => href.match(/orderID=([A-Z0-9-]+)/i)?.[1])
         .filter((orderId): orderId is string => Boolean(orderId));
 
-      if (orderIds.length > 0) return orderIds;
+      if (matchedOrderIds.length > 0) return matchedOrderIds;
 
       return (
         item.textContent?.match(/[A-Z]?\d{2,3}-\d{7}-\d{7}/g) || []
@@ -256,7 +257,7 @@ async function extractStrategyApx(
       let vendor = "";
       let status = "";
 
-      for (const span of item.querySelectorAll("span")) {
+      for (const span of Array.from(item.querySelectorAll("span"))) {
         const text = span.textContent?.trim() || "";
         if (!text) continue;
 
@@ -278,8 +279,10 @@ async function extractStrategyApx(
     };
 
     const browserWindow = globalThis as unknown as BrowserWindow;
-    const nodes = browserWindow.document.querySelectorAll(
-      ".apx-transaction-date-container, .apx-transactions-line-item-component-container",
+    const nodes = Array.from(
+      browserWindow.document.querySelectorAll(
+        ".apx-transaction-date-container, .apx-transactions-line-item-component-container",
+      ),
     );
     const results: RawApxTransaction[] = [];
     let currentDate = "";
@@ -702,8 +705,9 @@ async function goToNextPage(page: Page): Promise<boolean> {
       await page.waitForFunction(
         (previous) => {
           const browserWindow = globalThis as unknown as BrowserWindow;
-          const currentRows = browserWindow.document
-            .querySelectorAll(APX_TRANSACTION_SELECTOR)
+          const currentRows = Array.from(
+            browserWindow.document.querySelectorAll(APX_TRANSACTION_SELECTOR),
+          )
             .map((row) => row.textContent?.trim() || "");
           return (
             browserWindow.location.href !== previous.url ||
