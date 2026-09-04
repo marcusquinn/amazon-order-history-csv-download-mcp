@@ -152,23 +152,50 @@ jobs:
           echo "name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Pack release artifact
+        id: artifact
+        env:
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          PACK_OUTPUT=$(npm pack --json)
+          node -e 'const value = JSON.parse(process.argv[1])[0]; const allowed = value.files.length > 0 && value.files.every(file => ["LICENSE", "README.md", "package.json"].includes(file.path) || file.path.startsWith("dist/")); if (value.name !== process.argv[2] || value.version !== process.argv[3] || !value.filename || !value.integrity || !value.shasum || !allowed) process.exit(1)' "$PACK_OUTPUT" "$PACKAGE_NAME" "$PACKAGE_VERSION"
+
+          PACKAGE_FILE=$(node -e 'const value = JSON.parse(process.argv[1])[0]; process.stdout.write(value.filename)' "$PACK_OUTPUT")
+          PACKAGE_INTEGRITY=$(node -e 'const value = JSON.parse(process.argv[1])[0]; process.stdout.write(value.integrity)' "$PACK_OUTPUT")
+          PACKAGE_SHASUM=$(node -e 'const value = JSON.parse(process.argv[1])[0]; process.stdout.write(value.shasum)' "$PACK_OUTPUT")
+
+          test -f "$PACKAGE_FILE"
+          echo "filename=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
+          echo "integrity=$PACKAGE_INTEGRITY" >> "$GITHUB_OUTPUT"
+          echo "shasum=$PACKAGE_SHASUM" >> "$GITHUB_OUTPUT"
+
       - name: Check registry version
         id: registry
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
           RELEASE_SHA: ${{ github.sha }}
+          LOCAL_INTEGRITY: ${{ steps.artifact.outputs.integrity }}
+          LOCAL_SHASUM: ${{ steps.artifact.outputs.shasum }}
         run: |
           set +e
-          REGISTRY_OUTPUT=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version gitHead --json 2>&1)
+          REGISTRY_OUTPUT=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version gitHead dist --json 2>&1)
           REGISTRY_STATUS=$?
           set -e
 
           if [ "$REGISTRY_STATUS" -eq 0 ]; then
             REGISTRY_VERSION=$(node -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.version || "")' "$REGISTRY_OUTPUT")
             REGISTRY_GIT_HEAD=$(node -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.gitHead || "")' "$REGISTRY_OUTPUT")
+            REGISTRY_INTEGRITY=$(node -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.dist?.integrity || "")' "$REGISTRY_OUTPUT")
+            REGISTRY_SHASUM=$(node -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.dist?.shasum || "")' "$REGISTRY_OUTPUT")
             test "$REGISTRY_VERSION" = "$PACKAGE_VERSION"
-            test "$REGISTRY_GIT_HEAD" = "$RELEASE_SHA"
+            test "$REGISTRY_INTEGRITY" = "$LOCAL_INTEGRITY"
+            test "$REGISTRY_SHASUM" = "$LOCAL_SHASUM"
+            # npm may omit gitHead; when present, it must still bind to the release commit.
+            if [ -n "$REGISTRY_GIT_HEAD" ]; then
+              test "$REGISTRY_GIT_HEAD" = "$RELEASE_SHA"
+            fi
             echo "exists=true" >> "$GITHUB_OUTPUT"
           elif printf '%s' "$REGISTRY_OUTPUT" | grep -q 'E404'; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -179,14 +206,18 @@ jobs:
 
       - name: Publish package
         if: steps.registry.outputs.exists == 'false'
-        run: npm publish
+        env:
+          PACKAGE_FILE: ${{ steps.artifact.outputs.filename }}
+        run: npm publish "$PACKAGE_FILE"
 
       - name: Publication summary
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+          PACKAGE_INTEGRITY: ${{ steps.artifact.outputs.integrity }}
           VERSION_EXISTS: ${{ steps.registry.outputs.exists }}
         run: |
           echo "## npm publication" >> "$GITHUB_STEP_SUMMARY"
           echo "- Package: ${PACKAGE_NAME}@${PACKAGE_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Integrity: ${PACKAGE_INTEGRITY}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Already published: ${VERSION_EXISTS}" >> "$GITHUB_STEP_SUMMARY"
