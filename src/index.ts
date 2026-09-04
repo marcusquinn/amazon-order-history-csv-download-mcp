@@ -15,11 +15,11 @@ import {
   ProgressNotification,
 } from "@modelcontextprotocol/sdk/types.js";
 import { chromium, BrowserContext, Page } from "playwright";
-import { join } from "path";
+import { isAbsolute, join } from "path";
 import { homedir } from "os";
 
 import { AmazonPlugin } from "./amazon/adapter";
-import { getRegionCodes } from "./amazon/regions";
+import { getRegionByCode, getRegionCodes } from "./amazon/regions";
 import {
   fetchOrders,
   exportOrdersCSV,
@@ -30,6 +30,8 @@ import {
   getOutputPath,
   estimateExtractionTime,
   GiftCardTransactionCSVData,
+  downloadAmazonInvoice,
+  isValidAmazonOrderId,
 } from "./tools";
 import { extractTransactionsFromPage } from "./amazon/extractors/transactions-page";
 import {
@@ -238,6 +240,32 @@ const tools: Tool[] = [
           type: "boolean",
           description: "Include payment transaction details (default: false)",
           default: false,
+        },
+      },
+      required: ["order_id", "region"],
+    },
+  },
+  {
+    name: "download_amazon_invoice",
+    description:
+      "Download a verified Amazon order invoice as an A4 PDF. The requested order ID must match invoice-specific content before a PDF is saved.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        order_id: {
+          type: "string",
+          description:
+            "Amazon order ID in format XXX-XXXXXXX-XXXXXXX (e.g., 123-4567890-1234567)",
+        },
+        region: {
+          type: "string",
+          description: "Amazon region code where the order was placed",
+          enum: getRegionCodes(),
+        },
+        output_path: {
+          type: "string",
+          description:
+            "Optional absolute destination path. Defaults to ~/Downloads/amazon-{region}-invoice-{order_id}.pdf",
         },
       },
       required: ["order_id", "region"],
@@ -655,6 +683,93 @@ function formatGiftCardDataForCSV(
   }));
 }
 
+async function handleInvoiceDownload(
+  args: Record<string, unknown> | undefined,
+) {
+  const regionParam = args?.region as string | undefined;
+  const regionError = validateRegion(regionParam, args);
+  if (regionError) return regionError;
+  const region = regionParam ?? "";
+  const orderId = args?.order_id as string | undefined;
+  const requestedOutputPath = args?.output_path as string | undefined;
+
+  if (!orderId || !isValidAmazonOrderId(orderId)) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            status: "error",
+            params: { orderId, region, outputPath: requestedOutputPath },
+            error: "order_id must use the XXX-XXXXXXX-XXXXXXX Amazon format",
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const outputPath =
+    requestedOutputPath ??
+    join(homedir(), "Downloads", `amazon-${region}-invoice-${orderId}.pdf`);
+  if (!isAbsolute(outputPath)) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            status: "error",
+            params: { orderId, region, outputPath },
+            error: "output_path must be an absolute path",
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const regionConfig = getRegionByCode(region);
+  if (!regionConfig) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            status: "error",
+            params: { orderId, region, outputPath },
+            error: `Invalid region: "${region}"`,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const result = await downloadAmazonInvoice({
+    page: await getPage(),
+    orderId,
+    domain: regionConfig.domain,
+    outputPath,
+  });
+  const response = result.success
+    ? {
+        status: "success",
+        params: { orderId, region, outputPath },
+        path: result.filePath,
+        bytes: result.bytes,
+      }
+    : {
+        status: "error",
+        params: { orderId, region, outputPath },
+        error: result.error,
+      };
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+    ...(result.success ? {} : { isError: true }),
+  };
+}
+
 // Handle list tools request
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools };
@@ -857,6 +972,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             },
           ],
         };
+      }
+
+      case "download_amazon_invoice": {
+        return handleInvoiceDownload(args);
       }
 
       case "export_amazon_orders_csv": {
