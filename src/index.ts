@@ -683,6 +683,93 @@ function formatGiftCardDataForCSV(
   }));
 }
 
+async function handleInvoiceDownload(
+  args: Record<string, unknown> | undefined,
+) {
+  const regionParam = args?.region as string | undefined;
+  const regionError = validateRegion(regionParam, args);
+  if (regionError) return regionError;
+  const region = regionParam ?? "";
+  const orderId = args?.order_id as string | undefined;
+  const requestedOutputPath = args?.output_path as string | undefined;
+
+  if (!orderId || !isValidAmazonOrderId(orderId)) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            status: "error",
+            params: { orderId, region, outputPath: requestedOutputPath },
+            error: "order_id must use the XXX-XXXXXXX-XXXXXXX Amazon format",
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const outputPath =
+    requestedOutputPath ??
+    join(homedir(), "Downloads", `amazon-${region}-invoice-${orderId}.pdf`);
+  if (!isAbsolute(outputPath)) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            status: "error",
+            params: { orderId, region, outputPath },
+            error: "output_path must be an absolute path",
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const regionConfig = getRegionByCode(region);
+  if (!regionConfig) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            status: "error",
+            params: { orderId, region, outputPath },
+            error: `Invalid region: "${region}"`,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const result = await downloadAmazonInvoice({
+    page: await getPage(),
+    orderId,
+    domain: regionConfig.domain,
+    outputPath,
+  });
+  const response = result.success
+    ? {
+        status: "success",
+        params: { orderId, region, outputPath },
+        path: result.filePath,
+        bytes: result.bytes,
+      }
+    : {
+        status: "error",
+        params: { orderId, region, outputPath },
+        error: result.error,
+      };
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+    ...(result.success ? {} : { isError: true }),
+  };
+}
+
 // Handle list tools request
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools };
@@ -888,77 +975,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "download_amazon_invoice": {
-        const regionParam = args?.region as string | undefined;
-        const regionError = validateRegion(regionParam, args);
-        if (regionError) return regionError;
-        const region = regionParam!;
-        const orderId = args?.order_id as string | undefined;
-        const requestedOutputPath = args?.output_path as string | undefined;
-
-        if (!orderId || !isValidAmazonOrderId(orderId)) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  status: "error",
-                  params: { orderId, region, outputPath: requestedOutputPath },
-                  error:
-                    "order_id must use the XXX-XXXXXXX-XXXXXXX Amazon format",
-                }),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        const outputPath =
-          requestedOutputPath ??
-          join(
-            homedir(),
-            "Downloads",
-            `amazon-${region}-invoice-${orderId}.pdf`,
-          );
-        if (!isAbsolute(outputPath)) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  status: "error",
-                  params: { orderId, region, outputPath },
-                  error: "output_path must be an absolute path",
-                }),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        const regionConfig = getRegionByCode(region);
-        const result = await downloadAmazonInvoice({
-          page: await getPage(),
-          orderId,
-          domain: regionConfig!.domain,
-          outputPath,
-        });
-        const response = result.success
-          ? {
-              status: "success",
-              params: { orderId, region, outputPath },
-              path: result.filePath,
-              bytes: result.bytes,
-            }
-          : {
-              status: "error",
-              params: { orderId, region, outputPath },
-              error: result.error,
-            };
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
-          ...(result.success ? {} : { isError: true }),
-        };
+        return handleInvoiceDownload(args);
       }
 
       case "export_amazon_orders_csv": {
