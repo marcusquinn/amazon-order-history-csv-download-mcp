@@ -21,18 +21,28 @@ Supports orders, items, shipments, and transactions export across 16 Amazon regi
 
 ### Installation
 
+Install the MCP server globally from npm, then install Chromium for Playwright:
+
 ```bash
-# Clone the repository
+npm install --global amazon-order-history-csv-download-mcp
+npx playwright install chromium
+```
+
+You can also run the server without a global installation:
+
+```bash
+npx --yes amazon-order-history-csv-download-mcp
+```
+
+Node.js 18 or newer is required.
+
+For source development, clone the repository and build it locally:
+
+```bash
 git clone https://github.com/marcusquinn/amazon-order-history-csv-download-mcp.git
 cd amazon-order-history-csv-download-mcp
-
-# Install dependencies
-npm install
-
-# Build
+npm ci
 npm run build
-
-# Install Playwright browsers
 npx playwright install chromium
 ```
 
@@ -44,12 +54,15 @@ Add to your MCP client configuration (e.g., Claude Desktop):
 {
   "mcpServers": {
     "amazon-orders": {
-      "command": "node",
-      "args": ["/path/to/amazon-order-history-csv-download-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["--yes", "amazon-order-history-csv-download-mcp"]
     }
   }
 }
 ```
+
+Source checkouts can instead use `node` with the absolute path to
+`dist/index.js`.
 
 ### Usage
 
