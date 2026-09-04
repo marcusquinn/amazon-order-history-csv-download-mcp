@@ -76,10 +76,7 @@ jobs:
             ### Installation
 
             ```bash
-            git clone https://github.com/marcusquinn/amazon-order-history-csv-download-mcp.git
-            cd amazon-order-history-csv-download-mcp
-            npm install
-            npm run build
+            npm install --global amazon-order-history-csv-download-mcp
             npx playwright install chromium
             ```
 
@@ -101,3 +98,95 @@ jobs:
         run: |
           echo "## Release Skipped" >> $GITHUB_STEP_SUMMARY
           echo "Tag ${{ steps.version.outputs.tag }} already exists" >> $GITHUB_STEP_SUMMARY
+
+  publish-npm:
+    name: Publish npm package
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout released commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.19.0"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Use trusted-publishing-compatible npm
+        run: npm install --global npm@11.17.0 --ignore-scripts
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Verify release candidate
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Verify tag and package metadata
+        id: package
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          VERSION=$(node --print "require('./package.json').version")
+          PACKAGE_NAME=$(node --print "require('./package.json').name")
+          FILE_VERSION=$(tr -d '\r\n' < VERSION)
+          TAG="v${VERSION}"
+
+          test "$VERSION" = "$FILE_VERSION"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          TAG_SHA=$(git rev-list -n 1 "$TAG")
+          test "$TAG_SHA" = "$RELEASE_SHA"
+
+          echo "name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check registry version
+        id: registry
+        env:
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set +e
+          REGISTRY_OUTPUT=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version gitHead --json 2>&1)
+          REGISTRY_STATUS=$?
+          set -e
+
+          if [ "$REGISTRY_STATUS" -eq 0 ]; then
+            REGISTRY_VERSION=$(node -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.version || "")' "$REGISTRY_OUTPUT")
+            REGISTRY_GIT_HEAD=$(node -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.gitHead || "")' "$REGISTRY_OUTPUT")
+            test "$REGISTRY_VERSION" = "$PACKAGE_VERSION"
+            test "$REGISTRY_GIT_HEAD" = "$RELEASE_SHA"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$REGISTRY_OUTPUT" | grep -q 'E404'; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$REGISTRY_OUTPUT" >&2
+            exit "$REGISTRY_STATUS"
+          fi
+
+      - name: Publish package
+        if: steps.registry.outputs.exists == 'false'
+        run: npm publish
+
+      - name: Publication summary
+        env:
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+          VERSION_EXISTS: ${{ steps.registry.outputs.exists }}
+        run: |
+          echo "## npm publication" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Package: ${PACKAGE_NAME}@${PACKAGE_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Already published: ${VERSION_EXISTS}" >> "$GITHUB_STEP_SUMMARY"

@@ -4,9 +4,16 @@
   "description": "MCP server for downloading Amazon order history as CSV - supports orders, items, shipments, and transactions export",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "amazon-order-history-csv-download-mcp": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
-    "start": "npm run sync-core && node dist/index.js",
+    "prepack": "npm run build",
+    "start": "node dist/index.js",
     "dev": "CORE_DEV_MODE=true tsx watch src/index.ts",
     "sync-core": "node scripts/sync-core.js",
     "link-core": "node scripts/link-local-core.js",
@@ -44,6 +51,9 @@
     "url": "https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/issues"
   },
   "homepage": "https://github.com/marcusquinn/amazon-order-history-csv-download-mcp#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
