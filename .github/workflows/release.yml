@@ -76,7 +76,7 @@ jobs:
             ### Installation
 
             ```bash
-            npm install --global amazon-order-history-csv-download-mcp
+            npm install --global amz-order-history-csv-mcp
             npx playwright install chromium
             ```
 

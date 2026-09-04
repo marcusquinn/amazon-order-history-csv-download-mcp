@@ -24,7 +24,7 @@ Supports orders, items, shipments, and transactions export across 16 Amazon regi
 Install the MCP server globally from npm, then install Chromium for Playwright:
 
 ```bash
-npm install --global amazon-order-history-csv-download-mcp
+npm install --global amz-order-history-csv-mcp
 npx playwright install chromium
 ```
 
@@ -32,7 +32,7 @@ You can also run the server without a global installation:
 
 ```bash
 npx --yes playwright install chromium
-npx --yes amazon-order-history-csv-download-mcp
+npx --yes amz-order-history-csv-mcp
 ```
 
 Node.js 18 or newer is required.
@@ -56,7 +56,7 @@ Add to your MCP client configuration (e.g., Claude Desktop):
   "mcpServers": {
     "amazon-orders": {
       "command": "npx",
-      "args": ["--yes", "amazon-order-history-csv-download-mcp"]
+      "args": ["--yes", "amz-order-history-csv-mcp"]
     }
   }
 }
