@@ -17,6 +17,7 @@ import {
 import { chromium, BrowserContext, Page } from "playwright";
 import { isAbsolute, join } from "path";
 import { homedir } from "os";
+import packageMetadata from "../package.json";
 
 import { AmazonPlugin } from "./amazon/adapter";
 import { getRegionByCode, getRegionCodes } from "./amazon/regions";
@@ -556,7 +557,7 @@ const tools: Tool[] = [
 const server = new Server(
   {
     name: "amazon-order-history-csv-download-mcp",
-    version: "0.3.0",
+    version: packageMetadata.version,
   },
   {
     capabilities: {
