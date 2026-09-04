@@ -31,6 +31,7 @@ npx playwright install chromium
 You can also run the server without a global installation:
 
 ```bash
+npx --yes playwright install chromium
 npx --yes amazon-order-history-csv-download-mcp
 ```
 
