@@ -88,3 +88,6 @@ pids/
 !.windsurfrules
 !CLAUDE.md
 !.opencode/
+
+# AI runtime state
+.agents/loop-state/

@@ -8,16 +8,16 @@ Containerized test environment for Amazon Order History CSV Download MCP.
 cd tests/docker
 
 # Run all tests
-docker-compose run --rm test
+docker compose run --rm test
 
 # Run unit tests only
-docker-compose run --rm test-unit
+docker compose run --rm test-unit
 
 # Interactive shell for debugging
-docker-compose run --rm shell
+docker compose run --rm shell
 
 # Build fresh
-docker-compose build --no-cache
+docker compose build --no-cache
 ```
 
 ## What's Tested
