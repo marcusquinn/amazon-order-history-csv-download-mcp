@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-04
+
+### Fixed
+
+- Docker CI now uses Compose v2 with a repository-specific project name and reports the container test's real result (#16)
+
+### Changed
+
+- GitHub workflows now pin `actions/checkout` and `actions/setup-node` to verified Node 24-based release commits (#17)
+- Release publishing now pins `softprops/action-gh-release` to a verified Node 24-based release commit (#20)
+
 ## [0.4.1] - 2026-09-04
 
 ### Fixed
