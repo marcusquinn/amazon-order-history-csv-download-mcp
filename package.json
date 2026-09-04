@@ -1,5 +1,5 @@
 {
-  "name": "amazon-order-history-csv-download-mcp",
+  "name": "amz-order-history-csv-mcp",
   "version": "0.4.2",
   "description": "MCP server for downloading Amazon order history as CSV - supports orders, items, shipments, and transactions export",
   "main": "dist/index.js",
@@ -8,7 +8,7 @@
     "dist"
   ],
   "bin": {
-    "amazon-order-history-csv-download-mcp": "dist/index.js"
+    "amz-order-history-csv-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -45,7 +45,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/marcusquinn/amazon-order-history-csv-download-mcp.git"
+    "url": "git+https://github.com/marcusquinn/amazon-order-history-csv-download-mcp.git"
   },
   "bugs": {
     "url": "https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/issues"
