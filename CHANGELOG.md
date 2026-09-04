@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-09-04
+
+### Added
+
+- Public npm distribution as `amz-order-history-csv-mcp`, including an executable MCP entry point and registry-first setup documentation (#25)
+
+### Security
+
+- npm releases now use keyless GitHub OIDC Trusted Publishing and publish one allowlisted, prepacked artifact (#25)
+- Existing-version checks bind npm registry integrity and shasum metadata to the exact release artifact while validating `gitHead` when npm provides it (#25)
+
 ## [0.4.2] - 2026-09-04
 
 ### Fixed
@@ -133,7 +144,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-region date and currency parsing utilities
 - XPath extraction strategies for Amazon DOM
 
-[Unreleased]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/compare/v0.3.0...v0.3.1
