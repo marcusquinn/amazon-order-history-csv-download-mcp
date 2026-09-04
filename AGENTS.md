@@ -23,6 +23,7 @@ npm run build        # Compile TypeScript
 |------|-------------|
 | `get_amazon_orders` | Fetch order history for date range |
 | `get_amazon_order_details` | Get details for specific order |
+| `download_amazon_invoice` | Download a validated order invoice PDF |
 | `export_amazon_orders_csv` | Export orders summary CSV |
 | `export_amazon_items_csv` | Export items detail CSV |
 | `export_amazon_shipments_csv` | Export shipments/tracking CSV |

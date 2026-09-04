@@ -214,6 +214,26 @@ Gift card activity and balance history.
 | `get_amazon_gift_card_transactions` | Get detailed gift card activity               |
 | `check_amazon_auth_status`          | Check if browser is logged in                 |
 
+### Invoice PDF download (`download_amazon_invoice`)
+
+Downloads an A4 PDF for one authenticated order after confirming that the print
+page contains both the requested order ID and invoice-specific content.
+
+```json
+{
+  "order_id": "123-4567890-1234567",
+  "region": "uk",
+  "output_path": "/absolute/path/to/invoice.pdf"
+}
+```
+
+`output_path` is optional and must be absolute when supplied. The default is
+`~/Downloads/amazon-{region}-invoice-{order_id}.pdf`; its parent directory is
+created when needed. A successful response reports the saved `path` and exact
+`bytes`. Authentication redirects, Amazon error pages, mismatched invoice
+identity, rendering failures, and write failures return an MCP error without
+publishing a partial PDF or replacing a prior file.
+
 ### Transactions Page (`get_amazon_transactions`)
 
 Extracts ALL payment transactions from Amazon's dedicated transactions page (`/cpe/yourpayments/transactions`). Much faster than extracting from individual order pages.
