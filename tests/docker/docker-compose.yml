@@ -1,4 +1,6 @@
 # Test orchestration for Amazon Order History CSV Download MCP
+name: amazon-order-history-csv-download-mcp
+
 services:
   test:
     build:
