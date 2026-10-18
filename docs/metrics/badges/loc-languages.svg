@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="96" role="img" aria-label="languages by lines of code">
+  <title>languages by lines of code</title>
+  <style>.bg{fill:#ffffff}.track{fill:#eaecef}.lbl{fill:#24292f}.pct{fill:#57606a}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.track{fill:#30363d}.lbl{fill:#e6edf3}.pct{fill:#8b949e}}</style>
+  <rect class="bg" width="520" height="96"/>
+  <rect class="track" x="20" y="10" width="480" height="14" rx="3"/>
+  <rect x="20" y="10" width="258" height="14" fill="#3178c6"/>
+  <rect x="278" y="10" width="185" height="14" fill="#292929"/>
+  <rect x="463" y="10" width="17" height="14" fill="#083fa1"/>
+  <rect x="480" y="10" width="9" height="14" fill="#cb171e"/>
+  <rect x="489" y="10" width="4" height="14" fill="#89e051"/>
+  <rect x="493" y="10" width="7" height="14" fill="#e34c26"/>
+  <rect x="20" y="34" width="10" height="10" rx="2" fill="#3178c6"/>
+  <text x="34" y="44" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">TypeScript <tspan class="pct">53.4%</tspan></text>
+  <rect x="270" y="34" width="10" height="10" rx="2" fill="#292929"/>
+  <text x="284" y="44" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">JSON <tspan class="pct">38.4%</tspan></text>
+  <rect x="20" y="50" width="10" height="10" rx="2" fill="#083fa1"/>
+  <text x="34" y="60" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">Markdown <tspan class="pct">3.7%</tspan></text>
+  <rect x="270" y="50" width="10" height="10" rx="2" fill="#cb171e"/>
+  <text x="284" y="60" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">YAML <tspan class="pct">1.9%</tspan></text>
+  <rect x="20" y="66" width="10" height="10" rx="2" fill="#89e051"/>
+  <text x="34" y="76" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">Shell <tspan class="pct">0.9%</tspan></text>
+  <rect x="270" y="66" width="10" height="10" rx="2" fill="#e34c26"/>
+  <text x="284" y="76" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">HTML <tspan class="pct">0.8%</tspan></text>
+</svg>
