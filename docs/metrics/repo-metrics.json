@@ -1,0 +1,149 @@
+{
+  "schema": "aidevops.repo-metrics.v1",
+  "schema_version": 1,
+  "generated_at": "2026-10-18T16:02:21Z",
+  "tool": {
+    "name": "aidevops repo-metrics",
+    "version": "1.0.0"
+  },
+  "repo": {
+    "name": "amazon-order-history-csv-download-mcp",
+    "slug": "marcusquinn/amazon-order-history-csv-download-mcp"
+  },
+  "summary": {
+    "source_files": 65,
+    "code": 17818,
+    "comments": 1699,
+    "blanks": 1784,
+    "languages": 8,
+    "dependencies": 485
+  },
+  "languages": [
+    {
+      "name": "TypeScript",
+      "files": 38,
+      "code": 9514,
+      "comments": 1646,
+      "blanks": 1385,
+      "percentage": 53.4,
+      "color": "#3178c6"
+    },
+    {
+      "name": "JSON",
+      "files": 5,
+      "code": 6837,
+      "comments": 0,
+      "blanks": 0,
+      "percentage": 38.37,
+      "color": "#292929"
+    },
+    {
+      "name": "Markdown",
+      "files": 7,
+      "code": 660,
+      "comments": 0,
+      "blanks": 264,
+      "percentage": 3.7,
+      "color": "#083fa1"
+    },
+    {
+      "name": "YAML",
+      "files": 6,
+      "code": 348,
+      "comments": 6,
+      "blanks": 70,
+      "percentage": 1.95,
+      "color": "#cb171e"
+    },
+    {
+      "name": "Shell",
+      "files": 1,
+      "code": 153,
+      "comments": 10,
+      "blanks": 34,
+      "percentage": 0.86,
+      "color": "#89e051"
+    },
+    {
+      "name": "HTML",
+      "files": 4,
+      "code": 139,
+      "comments": 1,
+      "blanks": 2,
+      "percentage": 0.78,
+      "color": "#e34c26"
+    },
+    {
+      "name": "JavaScript",
+      "files": 3,
+      "code": 137,
+      "comments": 27,
+      "blanks": 21,
+      "percentage": 0.77,
+      "color": "#f1e05a"
+    },
+    {
+      "name": "Dockerfile",
+      "files": 1,
+      "code": 30,
+      "comments": 9,
+      "blanks": 8,
+      "percentage": 0.17,
+      "color": "#384d54"
+    }
+  ],
+  "dependencies": {
+    "direct": 14,
+    "runtime": 3,
+    "dev": 11,
+    "locked": 485,
+    "total": 485,
+    "ecosystems": [
+      "npm"
+    ],
+    "manifests": [
+      {
+        "path": "package.json",
+        "ecosystem": "npm",
+        "direct": 14,
+        "runtime": 3,
+        "dev": 11,
+        "locked": 485,
+        "dependencies": [
+          "@modelcontextprotocol/sdk",
+          "@types/jest",
+          "@types/node",
+          "@typescript-eslint/eslint-plugin",
+          "@typescript-eslint/parser",
+          "eslint",
+          "eslint-config-prettier",
+          "jest",
+          "playwright",
+          "prettier",
+          "ts-jest",
+          "tsx",
+          "typescript",
+          "zod"
+        ],
+        "dev_dependencies": [
+          "@types/jest",
+          "@types/node",
+          "@typescript-eslint/eslint-plugin",
+          "@typescript-eslint/parser",
+          "eslint",
+          "eslint-config-prettier",
+          "jest",
+          "prettier",
+          "ts-jest",
+          "tsx",
+          "typescript"
+        ]
+      }
+    ]
+  },
+  "refresh": {
+    "default_policy": "weekly scheduled refresh plus manual runs; skip generated outputs younger than 24h in managed workflows",
+    "cost_profile": "fast local git/unignored-file scan; no network by default",
+    "top_languages": 6
+  }
+}

@@ -1,7 +1,20 @@
 # Amazon Order History CSV Download MCP
 
-[![GitHub Actions](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/workflows/Code%20Quality/badge.svg)](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<!-- aidevops:badges:start -->
+<!-- managed by aidevops badges; edit the template, not this block -->
+[![GitHub Actions](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/actions/workflows/code-quality.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=marcusquinn_amazon-order-history-csv-download-mcp&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=marcusquinn_amazon-order-history-csv-download-mcp)
+[![Codacy grade](https://app.codacy.com/project/badge/Grade/ea33a871ce9e4f659b6cdc0e5e3b2982)](https://app.codacy.com/gh/marcusquinn/amazon-order-history-csv-download-mcp/dashboard)
+[![CodeFactor](https://www.codefactor.io/repository/github/marcusquinn/amazon-order-history-csv-download-mcp/badge)](https://www.codefactor.io/repository/github/marcusquinn/amazon-order-history-csv-download-mcp)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/blob/main/LICENSE)
+[![Latest release](https://img.shields.io/badge/release-latest-blue.svg)](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/releases/latest)
+
+[![Lines of code](docs/metrics/badges/loc.svg)](docs/metrics/repo-metrics.md)
+[![Dependencies](docs/metrics/badges/dependencies.svg)](docs/metrics/repo-metrics.md)
+
+[![Languages by lines of code](docs/metrics/badges/languages.svg)](docs/metrics/repo-metrics.md)
+<!-- aidevops:badges:end -->
+
 [![Version](https://img.shields.io/badge/Version-0.4.3-blue)](https://github.com/marcusquinn/amazon-order-history-csv-download-mcp/releases)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
 [![AGENTS.md](https://img.shields.io/badge/AGENTS.md-Compliant-blue.svg)](https://agents.md/)
