@@ -1,7 +1,7 @@
 {
   "schema": "aidevops.repo-metrics.v1",
   "schema_version": 1,
-  "generated_at": "2026-10-29T03:56:00Z",
+  "generated_at": "2026-11-01T22:51:54Z",
   "tool": {
     "name": "aidevops repo-metrics",
     "version": "1.0.0"
