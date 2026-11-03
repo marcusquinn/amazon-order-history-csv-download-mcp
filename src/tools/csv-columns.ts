@@ -104,7 +104,7 @@ export const ORDER_CSV_COLUMNS: CSVColumn<OrderCSVData>[] = [
   {
     key: "itemCount",
     header: "Items",
-    getValue: (o) => o.itemCount ?? o.items?.length ?? 0,
+    getValue: (o) => o.itemCount ?? o.items?.length ?? "",
   },
 
   // Shipping address (up to 7 lines) - available from order card popover

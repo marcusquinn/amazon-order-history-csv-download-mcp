@@ -833,7 +833,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     total: o.total,
                     status: o.status?.label || "Unknown",
                     // Use itemCount from order header (extracted from list page) or fall back to items array length
-                    itemCount: o.itemCount ?? o.items?.length ?? 0,
+                    itemCount: o.itemCount ?? o.items?.length,
                     shipmentCount: o.shipments?.length || 0,
                     // Enhanced order header data from list page
                     subtotal: o.subtotal,

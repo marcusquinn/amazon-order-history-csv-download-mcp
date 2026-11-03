@@ -699,6 +699,25 @@ export async function fetchOrders(
               const expectedItemCount = order.itemCount || 0;
               const invoiceItemCount = invoiceData.items?.length || 0;
 
+              const invoiceItems = (invoiceData.items ?? []).map((ii) => ({
+                id: ii.asin || ii.name.slice(0, 50),
+                asin: ii.asin,
+                name: ii.name,
+                quantity: ii.quantity,
+                unitPrice: ii.unitPrice,
+                totalPrice: {
+                  ...ii.unitPrice,
+                  amount: ii.unitPrice.amount * ii.quantity,
+                },
+                url: ii.asin
+                  ? `https://www.${regionConfig.domain}/dp/${ii.asin}`
+                  : "",
+                orderHeader: enrichedHeader,
+                condition: ii.condition,
+                seller: ii.seller ? { name: ii.seller } : undefined,
+                subscriptionFrequency: ii.subscriptionFrequency,
+                platformData: { source: "invoice" },
+              }));
               if (
                 invoiceData.items &&
                 invoiceItemCount > 0 &&
@@ -706,30 +725,11 @@ export async function fetchOrders(
                   invoiceItemCount >= expectedItemCount)
               ) {
                 // Invoice has items and count looks correct - use invoice data
-                const items = invoiceData.items.map((ii) => ({
-                  id: ii.asin || ii.name.slice(0, 50),
-                  asin: ii.asin,
-                  name: ii.name,
-                  quantity: ii.quantity,
-                  unitPrice: ii.unitPrice,
-                  totalPrice: {
-                    ...ii.unitPrice,
-                    amount: ii.unitPrice.amount * ii.quantity,
-                  },
-                  url: ii.asin
-                    ? `https://www.${regionConfig.domain}/dp/${ii.asin}`
-                    : "",
-                  orderHeader: enrichedHeader,
-                  condition: ii.condition,
-                  seller: ii.seller ? { name: ii.seller } : undefined,
-                  subscriptionFrequency: ii.subscriptionFrequency,
-                  platformData: { source: "invoice" },
-                }));
                 console.error(
-                  `[fetch-orders] Found ${items.length} items from invoice (expected ${expectedItemCount})`,
+                  `[fetch-orders] Found ${invoiceItems.length} items from invoice (expected ${expectedItemCount})`,
                 );
-                result.items.push(...items);
-                order.items = items;
+                result.items.push(...invoiceItems);
+                order.items = invoiceItems;
               } else {
                 // Fallback to detail page if:
                 // - Invoice extraction found no items, OR
@@ -737,23 +737,40 @@ export async function fetchOrders(
                 console.error(
                   `[fetch-orders] Invoice has ${invoiceItemCount} items but expected ${expectedItemCount}, falling back to detail page`,
                 );
-                await page.goto(order.detailUrl, {
-                  waitUntil: "domcontentloaded",
-                  timeout: 15000,
-                });
-                await page
-                  .waitForSelector('.a-box, [data-component="orderDetails"]', {
-                    timeout: 1000,
-                  })
-                  .catch(() => {});
-                const items = await plugin
-                  .extractItems(page, enrichedHeader)
-                  .catch(() => []);
+                let items: Item[] = [];
+                try {
+                  await page.goto(order.detailUrl, {
+                    waitUntil: "domcontentloaded",
+                    timeout: 15000,
+                  });
+                  await page
+                    .waitForSelector(
+                      '.a-box, [data-component="orderDetails"]',
+                      {
+                        timeout: 1000,
+                      },
+                    )
+                    .catch(() => {});
+                  items = await plugin.extractItems(page, enrichedHeader);
+                } catch (error) {
+                  result.errors.push(
+                    `Order ${order.id}: detail fallback failed: ${error}`,
+                  );
+                }
                 console.error(
                   `[fetch-orders] Found ${items.length} items from detail page`,
                 );
-                result.items.push(...items);
-                order.items = items;
+                // A fallback must not discard invoice rows when a layout is
+                // unsupported or the summary count is only an estimate.
+                const selectedItems =
+                  items.length >= invoiceItems.length ? items : invoiceItems;
+                result.items.push(...selectedItems);
+                order.items = selectedItems;
+                if (selectedItems.length < expectedItemCount) {
+                  result.errors.push(
+                    `Order ${order.id}: extracted ${selectedItems.length} product lines; summary reports ${expectedItemCount}. Retained available items; verify receipt completeness.`,
+                  );
+                }
               }
             }
 
