@@ -89,4 +89,35 @@ describe("item reconciliation", () => {
       "",
     ]);
   });
+  it("preserves invoice-only products in a longer disjoint detail result", () => {
+    expect(
+      selectFallbackItems(
+        [row("B", "$2"), row("C", "$3")],
+        [row("A", "$1")],
+      ).map((item) => item.name),
+    ).toEqual(["B", "C", "A"]);
+  });
+  it("does not duplicate matched products when prices differ", () => {
+    const result = selectFallbackItems(
+      [row("A", "$0.00"), row("B", "$3")],
+      [row("A", "$12")],
+    );
+    expect(result.map((item) => item.name)).toEqual(["A", "B"]);
+    expect(result[0].unitPrice.amount).toBe(0);
+  });
+  it("preserves only excess duplicate invoice occurrences", () => {
+    const result = selectFallbackItems(
+      [row("A", ""), row("B", "$3"), row("C", "$4")],
+      [row("A", "$12"), row("A", "$8")],
+    );
+    expect(result.map((item) => item.name)).toEqual(["A", "B", "C", "A"]);
+    expect(result[0].unitPrice.formatted).toBe("");
+  });
+  it("consumes identity matches even when invoice prices are missing", () => {
+    const result = selectFallbackItems(
+      [row("A", "$2"), row("B", "$3")],
+      [row("A", "")],
+    );
+    expect(result.map((item) => item.name)).toEqual(["A", "B"]);
+  });
 });

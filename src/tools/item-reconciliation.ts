@@ -10,48 +10,55 @@ export function resolveItemCount(order: {
   );
 }
 
-/** Keep the fuller source; only restore prices with unambiguous row correspondence. */
+/** Match product identity independently of price so price differences do not duplicate rows. */
+function sameProduct(left: Item, right: Item): boolean {
+  return (
+    left.name.trim() === right.name.trim() &&
+    left.quantity === right.quantity &&
+    left.condition === right.condition &&
+    left.seller?.name === right.seller?.name &&
+    (!left.asin || !right.asin || left.asin === right.asin)
+  );
+}
+
+/** Preserve unmatched invoice rows and restore only unambiguous missing prices. */
 export function selectFallbackItems(details: Item[], invoice: Item[]): Item[] {
   if (details.length <= invoice.length) return invoice;
   const available = [...invoice];
-  return details.map((detail) => {
-    // The original price text distinguishes an absent price from a real zero.
-    const candidates = available.filter(
-      (row) =>
-        row.name.trim() === detail.name.trim() &&
-        row.quantity === detail.quantity &&
-        row.condition === detail.condition &&
-        row.seller?.name === detail.seller?.name &&
-        (!row.asin || !detail.asin || row.asin === detail.asin) &&
-        Boolean(row.unitPrice.formatted.trim()),
-    );
-    if (detail.unitPrice?.formatted.trim()) {
-      const pricedMatch = candidates.find(
-        (row) =>
-          row.unitPrice.amount === detail.unitPrice.amount &&
-          row.unitPrice.currency === detail.unitPrice.currency &&
-          row.totalPrice.amount === detail.totalPrice.amount,
-      );
-      if (pricedMatch) available.splice(available.indexOf(pricedMatch), 1);
-      return detail;
-    }
+  const reconciled = details.map((detail) => {
+    const candidates = available.filter((row) => sameProduct(row, detail));
     if (!candidates.length) return detail;
-    const match = candidates[0];
-    // Duplicate lines with different prices cannot safely be paired by position.
-    if (
-      candidates.some(
+    const hasPrice = Boolean(detail.unitPrice?.formatted.trim());
+    // Prefer an exact price match when possible, but consume an identity match
+    // even if prices differ or neither page exposes a price.
+    const match =
+      (hasPrice &&
+        candidates.find(
+          (row) =>
+            row.unitPrice.amount === detail.unitPrice.amount &&
+            row.unitPrice.currency === detail.unitPrice.currency &&
+            row.totalPrice.amount === detail.totalPrice.amount,
+        )) ||
+      candidates[0];
+    available.splice(available.indexOf(match), 1);
+    if (hasPrice || !match.unitPrice.formatted.trim()) return detail;
+    // Evaluate all original duplicates, not just the remaining rows: consuming
+    // an ambiguous match must not make the next duplicate appear unambiguous.
+    const ambiguous = invoice
+      .filter((row) => sameProduct(row, detail))
+      .some(
         (row) =>
+          !row.unitPrice.formatted.trim() ||
           row.unitPrice.amount !== match.unitPrice.amount ||
           row.unitPrice.currency !== match.unitPrice.currency ||
           row.totalPrice.amount !== match.totalPrice.amount,
-      )
-    )
-      return detail;
-    available.splice(available.indexOf(match), 1);
+      );
+    if (ambiguous) return detail;
     return {
       ...detail,
       unitPrice: match.unitPrice,
       totalPrice: match.totalPrice,
     };
   });
+  return [...reconciled, ...available];
 }

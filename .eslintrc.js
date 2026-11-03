@@ -7,6 +7,7 @@ module.exports = {
     project: "./tsconfig.eslint.json",
     tsconfigRootDir: __dirname,
   },
+  overrides: [{ files: [".eslintrc.js"], parserOptions: { project: null } }],
   plugins: ["@typescript-eslint"],
   extends: [
     "eslint:recommended",
