@@ -272,6 +272,8 @@ describe("fetchOrders date range orchestration", () => {
           : ["Product A", "Product B"],
       );
       expect(result.orders[0].items).toEqual(result.items);
+      if (scenario === "throws" || scenario === "navigation fails")
+        expect(result.errors.join(" ")).toContain("detail fallback failed");
       if (scenario === "complete") expect(result.errors).toEqual([]);
       else
         expect(result.errors.join(" ")).toContain(

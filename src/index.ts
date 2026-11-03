@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { resolveItemCount } from "./tools/item-reconciliation";
 
 /**
  * Amazon Order History CSV Download MCP Server
@@ -833,7 +834,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     total: o.total,
                     status: o.status?.label || "Unknown",
                     // Use itemCount from order header (extracted from list page) or fall back to items array length
-                    itemCount: o.itemCount ?? o.items?.length,
+                    itemCount: resolveItemCount(o),
                     shipmentCount: o.shipments?.length || 0,
                     // Enhanced order header data from list page
                     subtotal: o.subtotal,

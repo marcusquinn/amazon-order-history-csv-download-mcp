@@ -1,3 +1,4 @@
+import { resolveItemCount } from "./item-reconciliation";
 /**
  * CSV column definitions for each export type.
  * Based on AZAD's table_config.ts with improvements.
@@ -104,7 +105,7 @@ export const ORDER_CSV_COLUMNS: CSVColumn<OrderCSVData>[] = [
   {
     key: "itemCount",
     header: "Items",
-    getValue: (o) => o.itemCount ?? o.items?.length ?? "",
+    getValue: (o) => resolveItemCount(o) ?? "",
   },
 
   // Shipping address (up to 7 lines) - available from order card popover

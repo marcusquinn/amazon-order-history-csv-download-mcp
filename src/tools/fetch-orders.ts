@@ -1,3 +1,4 @@
+import { selectFallbackItems } from "./item-reconciliation";
 /**
  * Order fetching orchestration.
  * Handles the full flow of navigating pages and extracting order data.
@@ -762,8 +763,7 @@ export async function fetchOrders(
                 );
                 // A fallback must not discard invoice rows when a layout is
                 // unsupported or the summary count is only an estimate.
-                const selectedItems =
-                  items.length >= invoiceItems.length ? items : invoiceItems;
+                const selectedItems = selectFallbackItems(items, invoiceItems);
                 result.items.push(...selectedItems);
                 order.items = selectedItems;
                 if (selectedItems.length < expectedItemCount) {
