@@ -16,7 +16,7 @@
   <rect x="20" y="50" width="10" height="10" rx="2" fill="#083fa1"/>
   <text x="34" y="60" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">Markdown <tspan class="pct">3.7%</tspan></text>
   <rect x="270" y="50" width="10" height="10" rx="2" fill="#cb171e"/>
-  <text x="284" y="60" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">YAML <tspan class="pct">2.1%</tspan></text>
+  <text x="284" y="60" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">YAML <tspan class="pct">2.2%</tspan></text>
   <rect x="20" y="66" width="10" height="10" rx="2" fill="#89e051"/>
   <text x="34" y="76" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" class="lbl">Shell <tspan class="pct">0.9%</tspan></text>
   <rect x="270" y="66" width="10" height="10" rx="2" fill="#e34c26"/>

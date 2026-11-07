@@ -1,7 +1,7 @@
 {
   "schema": "aidevops.repo-metrics.v1",
   "schema_version": 1,
-  "generated_at": "2026-11-01T22:51:54Z",
+  "generated_at": "2026-11-07T20:26:29Z",
   "tool": {
     "name": "aidevops repo-metrics",
     "version": "1.0.0"
@@ -11,10 +11,10 @@
     "slug": "marcusquinn/amazon-order-history-csv-download-mcp"
   },
   "summary": {
-    "source_files": 66,
-    "code": 17839,
-    "comments": 1731,
-    "blanks": 1788,
+    "source_files": 67,
+    "code": 17853,
+    "comments": 1744,
+    "blanks": 1792,
     "languages": 8,
     "dependencies": 485
   },
@@ -25,7 +25,7 @@
       "code": 9514,
       "comments": 1646,
       "blanks": 1385,
-      "percentage": 53.33,
+      "percentage": 53.29,
       "color": "#3178c6"
     },
     {
@@ -34,7 +34,7 @@
       "code": 6837,
       "comments": 0,
       "blanks": 0,
-      "percentage": 38.33,
+      "percentage": 38.3,
       "color": "#292929"
     },
     {
@@ -48,11 +48,11 @@
     },
     {
       "name": "YAML",
-      "files": 7,
-      "code": 371,
-      "comments": 38,
-      "blanks": 74,
-      "percentage": 2.08,
+      "files": 8,
+      "code": 385,
+      "comments": 51,
+      "blanks": 78,
+      "percentage": 2.16,
       "color": "#cb171e"
     },
     {
