@@ -1,3 +1,4 @@
+import { extractFromInvoice } from "../../../src/amazon/extractors/invoice";
 import type { Page } from "playwright";
 import type { AmazonPlugin } from "../../../src/amazon/adapter";
 import {
@@ -9,6 +10,10 @@ import {
 import type { OrderHeader } from "../../../src/core/types/order";
 import type { OrderListParams } from "../../../src/core/types/platform";
 import { fetchOrders } from "../../../src/tools/fetch-orders";
+
+jest.mock("../../../src/amazon/extractors/invoice", () => ({
+  extractFromInvoice: jest.fn(),
+}));
 
 jest.mock("../../../src/amazon/extractors", () => ({
   extractOrderDetails: jest.fn(),
@@ -220,4 +225,62 @@ describe("fetchOrders date range orchestration", () => {
     expect(result.orders.map(({ id }) => id)).toEqual(["dated", "undated"]);
     expect(result.errors).toEqual([]);
   });
+  it.each(["empty", "throws", "navigation fails", "shorter", "complete"])(
+    "retains invoice rows when the detail fallback is %s",
+    async (scenario) => {
+      const header = {
+        ...order("123-1234567-1234567", new Date(2025, 0, 1)),
+        itemCount: 3,
+      };
+      mockedExtractOrderHeaders.mockResolvedValue([header]);
+      const invoiceItems = ["Product A", "Product B"].map((name) => ({
+        name,
+        quantity: 1,
+        unitPrice: header.total,
+      }));
+      jest
+        .mocked(extractFromInvoice)
+        .mockResolvedValue({ orderId: header.id, items: invoiceItems });
+      const detailItems =
+        scenario === "complete"
+          ? ["Detail A", "Detail B", "Detail C"].map((name) => ({ name }))
+          : scenario === "shorter"
+            ? [{ name: "Detail A" }]
+            : [];
+      const extractItems =
+        scenario === "throws"
+          ? jest.fn().mockRejectedValue(new Error("Unsupported layout"))
+          : jest.fn().mockResolvedValue(detailItems);
+      Object.assign(plugin, { extractItems });
+      if (scenario === "navigation fails") {
+        jest.mocked(page.goto).mockImplementation(async (url) => {
+          if (String(url) === header.detailUrl)
+            throw new Error("Navigation failed");
+          currentUrl = String(url);
+          return null;
+        });
+      }
+      const result = await fetchOrders(page, plugin, {
+        region: "us",
+        year: 2025,
+        includeItems: true,
+        useInvoice: true,
+      });
+      expect(result.items.map((item) => item.name)).toEqual(
+        scenario === "complete"
+          ? ["Detail A", "Detail B", "Detail C", "Product A", "Product B"]
+          : ["Product A", "Product B"],
+      );
+      expect(result.orders[0].items).toEqual(result.items);
+      if (scenario === "throws" || scenario === "navigation fails")
+        expect(result.errors.join(" ")).toContain("detail fallback failed");
+      if (scenario === "empty" || scenario === "shorter")
+        expect(result.errors.join(" ")).not.toContain("detail fallback failed");
+      if (scenario === "complete") expect(result.errors).toEqual([]);
+      else
+        expect(result.errors.join(" ")).toContain(
+          "verify receipt completeness",
+        );
+    },
+  );
 });
