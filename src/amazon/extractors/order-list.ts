@@ -509,10 +509,25 @@ async function extractPaymentMethod(
  * Counts the number of items displayed on the card using container-based strategies.
  * Avoids counting "Buy it again" buttons or duplicate links.
  */
-async function extractItemCount(
+export async function extractItemCount(
   card: import("playwright").Locator,
-): Promise<number> {
+): Promise<number | undefined> {
   try {
+    // Grid cards use product cells rather than the standard item containers.
+    // Count product lines, not quantity badges or duplicate image/title links.
+    const gridProducts = card.locator(
+      '.yo-enhanced-grid-cell .product-grid-image a[href*="/dp/"]',
+    );
+    const gridCount = await gridProducts.count();
+    if (gridCount > 0) {
+      const text = await card.innerText();
+      const hiddenCount = [...text.matchAll(/\band\s+(\d+)\s+more\b/gi)].reduce(
+        (sum, match) => sum + Number(match[1]),
+        0,
+      );
+      return gridCount + hiddenCount;
+    }
+
     // Strategy 1: data-component="purchasedItems" (modern layout 2024+)
     // This is the most reliable - each purchasedItems component = 1 item
     const purchasedItems = card.locator('[data-component="purchasedItems"]');
@@ -563,10 +578,10 @@ async function extractItemCount(
     }
 
     debug(`[extractItemCount] No items found with any strategy`);
-    return 0;
+    return undefined;
   } catch (e) {
     debug(`[extractItemCount] Error: ${e}`);
-    return 0;
+    return undefined;
   }
 }
 
