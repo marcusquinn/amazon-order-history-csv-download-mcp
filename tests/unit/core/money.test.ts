@@ -142,7 +142,7 @@ describe("money parsing", () => {
         expect(money.currency).toBe("USD");
       });
 
-      test("preserves CAD/AUD/MXN default currency for bare $ amounts", () => {
+      test("preserves CAD/AUD/MXN default currency for bare $ amounts", (): void => {
         const cad = parseMoney("$20.81", "CAD");
         expect(cad.amount).toBe(20.81);
         expect(cad.currency).toBe("CAD");
@@ -157,13 +157,13 @@ describe("money parsing", () => {
         expect(mxn.currencySymbol).toBe("MX$");
       });
 
-      test("parses explicit C$, A$, MX$ prefixes", () => {
+      test("parses explicit C$, A$, MX$ prefixes", (): void => {
         expect(parseMoney("C$20.81").currency).toBe("CAD");
         expect(parseMoney("A$20.81").currency).toBe("AUD");
         expect(parseMoney("MX$20.81").currency).toBe("MXN");
       });
 
-      test("maps bare $ to USD when default currency is non-dollar (e.g. GBP)", () => {
+      test("maps bare $ to USD when default currency is non-dollar (e.g. GBP)", (): void => {
         const money = parseMoney("$20.81", "GBP");
         expect(money.currency).toBe("USD");
       });
