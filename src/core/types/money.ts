@@ -52,8 +52,14 @@ export function parseMoney(formatted: string, defaultCurrency = "USD"): Money {
   let amountStr = workingStr;
 
   // Common currency patterns (match after optional negative sign removed)
+  const dollarCurrency = ["USD", "CAD", "AUD", "MXN"].includes(defaultCurrency)
+    ? defaultCurrency
+    : "USD";
   const currencyPatterns: [RegExp, string][] = [
-    [/^\$/, "USD"],
+    [/^C\$\s*/, "CAD"],
+    [/^A\$\s*/, "AUD"],
+    [/^MX\$\s*/, "MXN"],
+    [/^\$/, dollarCurrency],
     [/^£/, "GBP"],
     [/^€/, "EUR"],
     [/^¥/, "JPY"],
